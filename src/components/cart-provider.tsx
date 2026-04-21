@@ -106,7 +106,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = async (variantId: string, quantity: number) => {
     if (!user) {
-      toast.error('Please login to add items to cart');
+      toast.error('Please register or login to start shopping');
+      blink.auth.login(window.location.href);
       return;
     }
 
