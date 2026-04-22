@@ -14,7 +14,7 @@ export function Home() {
     const fetchData = async () => {
       try {
         let collections = await (blink.db as any).collections.list({
-          limit: 4,
+          limit: 6,
           where: { active: "1" }
         });
         
@@ -24,7 +24,7 @@ export function Home() {
         setFeaturedCollections(collections);
 
         let products = await (blink.db as any).products.list({
-          limit: 8,
+          limit: 12,
           orderBy: { id: 'desc' },
           where: { active: "1" }
         });
@@ -69,32 +69,29 @@ export function Home() {
       <section className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1490481651871-ab68de2b43d?q=80&w=2070&auto=format&fit=crop" 
+            src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=2071&auto=format&fit=crop" 
             alt="Hero Background" 
             className="h-full w-full object-cover"
             onError={(e) => {
               (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=2071&auto=format&fit=crop';
             }}
           />
-          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 bg-black/40" />
         </div>
         
         <div className="container relative z-10 mx-auto px-4 text-center text-white space-y-6">
           <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter uppercase animate-slide-up">
-            Spring/Summer 26
+            Habesha Elegance
           </h1>
           <p className="text-lg md:text-xl font-medium tracking-wide max-w-2xl mx-auto opacity-90 animate-fade-in delay-200">
-            Discover our latest collection of essentials designed for modern living.
+            Authentic Ethiopian craftsmanship meets modern style. Discover our exclusive collection.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 animate-fade-in delay-400">
             <Button size="lg" className="bg-white text-black hover:bg-white/90 px-10 uppercase tracking-widest text-xs font-bold h-14" asChild>
-              <Link to="/collections/all">Shop Now</Link>
+              <Link to="/collections/all">Shop Collection</Link>
             </Button>
-            <Button variant="outline" size="lg" className="border-white text-white hover:bg-white/10 px-10 uppercase tracking-widest text-xs font-bold h-14" onClick={() => {
-              const el = document.getElementById('editorial-section');
-              el?.scrollIntoView({ behavior: 'smooth' });
-            }}>
-              View Lookbook
+            <Button variant="outline" size="lg" className="border-white text-white hover:bg-white/10 px-10 uppercase tracking-widest text-xs font-bold h-14" asChild>
+              <Link to="/collections/traditional">Traditional Wear</Link>
             </Button>
           </div>
         </div>
@@ -104,15 +101,15 @@ export function Home() {
       <section className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-end mb-8 space-y-4 md:space-y-0">
           <div className="space-y-2">
-            <h2 className="font-serif text-3xl md:text-4xl font-bold uppercase tracking-tight">The Collections</h2>
-            <p className="text-muted-foreground">Curated drops for every occasion.</p>
+            <h2 className="font-serif text-3xl md:text-4xl font-bold uppercase tracking-tight">Shop by Category</h2>
+            <p className="text-muted-foreground">Explore our curated Ethiopian fashion categories.</p>
           </div>
           <Link to="/collections/all" className="flex items-center text-sm font-bold uppercase tracking-widest hover:text-accent transition-colors">
-            View All <ArrowRight className="ml-2 h-4 w-4" />
+            View All Categories <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {featuredCollections.length > 0 ? (
             featuredCollections.map((collection) => (
               <Link 

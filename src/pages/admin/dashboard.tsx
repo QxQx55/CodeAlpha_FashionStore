@@ -194,7 +194,7 @@ function AdminOverview() {
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Sales" value={`$${stats.totalSales.toFixed(2)}`} icon={TrendingUp} trend="+12%" />
+        <StatCard title="Total Sales" value={`${stats.totalSales.toLocaleString()} ETB`} icon={TrendingUp} trend="+12%" />
         <StatCard title="Orders" value={stats.totalOrders} icon={ShoppingBag} trend="+5%" />
         <StatCard title="Products" value={stats.activeProducts} icon={Package} />
         <StatCard title="Collections" value={stats.activeCollections} icon={Layers} />

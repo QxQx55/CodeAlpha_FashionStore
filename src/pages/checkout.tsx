@@ -14,11 +14,10 @@ import { cn } from '@/lib/utils';
 
 export function Checkout() {
   const { items, subtotal, clearCart } = useCart();
-  const { user, login } = useAuth();
+  const { user, isAuthenticated, isLoading, login } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
-  const [isGuestCheckout, setIsGuestCheckout] = useState(!user);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -27,7 +26,7 @@ export function Checkout() {
     address: '',
     city: '',
     postalCode: '',
-    country: 'United States',
+    country: 'Ethiopia',
     phone: '',
   });
   const [cardData, setCardData] = useState({
@@ -36,6 +35,13 @@ export function Checkout() {
     cvc: '',
     name: ''
   });
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast.error('Please register or login before purchase');
+      navigate('/login', { state: { from: { pathname: '/checkout' } } });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
 
   // Load saved addresses if user is logged in
   useEffect(() => {
@@ -52,7 +58,7 @@ export function Checkout() {
             address: defaultAddr.address,
             city: defaultAddr.city,
             postalCode: defaultAddr.postalCode,
-            country: defaultAddr.country || 'United States'
+            country: defaultAddr.country || 'Ethiopia'
           }));
         }
       }
@@ -60,8 +66,8 @@ export function Checkout() {
     }
   }, [user]);
 
-  const shippingCost = subtotal > 150 ? 0 : 15;
-  const tax = subtotal * 0.08;
+  const shippingCost = subtotal > 5000 ? 0 : 250;
+  const tax = subtotal * 0.15; // 15% VAT in Ethiopia
   const total = subtotal + shippingCost + tax;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,8 +97,11 @@ export function Checkout() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // For guest checkout, we allow without login
-    const userId = user?.id || `guest_${Date.now()}`;
+    if (!user) {
+      toast.error('Authentication required');
+      navigate('/login');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -101,7 +110,7 @@ export function Checkout() {
       
       // 1. Create Order
       const order = await (blink.db as any).orders.create({
-        userId: userId,
+        userId: user.id,
         totalAmount: total,
         status: 'processing',
         shippingAddress: JSON.stringify({ ...formData, paymentMethod })
@@ -139,13 +148,7 @@ export function Checkout() {
 
       toast.success('Order placed successfully!');
       
-      if (user) {
-        navigate(`/account/orders/${order.id}`);
-      } else {
-        // For guests, show confirmation page
-        navigate(`/?order=${order.id}`);
-        toast.success(`Order #${order.id.slice(-8)} confirmed! Check your email for details.`);
-      }
+      navigate(`/account/orders/${order.id}`);
     } catch (error) {
       toast.error('Failed to place order. Please try again.');
       console.error(error);
@@ -159,6 +162,8 @@ export function Checkout() {
   const isPaymentValid = paymentMethod === 'card' 
     ? cardData.number.replace(/\s/g, '').length === 16 && cardData.expiry.length === 5 && cardData.cvc.length >= 3
     : true;
+
+  if (isLoading) return <div className="py-40 text-center animate-pulse">Loading...</div>;
 
   if (items.length === 0) {
     return (
@@ -320,6 +325,18 @@ export function Checkout() {
                     className="h-12"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country" className="text-[10px] uppercase tracking-widest font-bold">Country</Label>
+                  <Input 
+                    id="country" 
+                    name="country" 
+                    value={formData.country} 
+                    onChange={handleInputChange} 
+                    required 
+                    className="h-12"
+                    disabled
+                  />
+                </div>
               </div>
             </section>
 
@@ -477,7 +494,7 @@ export function Checkout() {
               ) : (
                 <span className="flex items-center">
                   <Lock className="mr-2 h-4 w-4" />
-                  Pay ${total.toFixed(2)}
+                  Pay {total.toLocaleString()} ETB
                 </span>
               )}
             </Button>
@@ -504,37 +521,39 @@ export function Checkout() {
                       />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold leading-none">{item.product.name}</h4>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        Qty: {item.quantity} | {item.variant.size}
+                      <p className="text-xs font-bold">{item.product.name}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase">
+                        {item.variant.size} {item.variant.color && `• ${item.variant.color}`}
                       </p>
+                      <p className="text-[10px] text-muted-foreground">Qty: {item.quantity}</p>
                     </div>
                   </div>
-                  <span className="text-xs font-bold">
-                    ${((item.variant.price || item.product.basePrice) * item.quantity).toFixed(2)}
-                  </span>
+                  <p className="text-xs font-bold">
+                    {((item.variant.price || item.product.basePrice) * item.quantity).toLocaleString()} ETB
+                  </p>
                 </div>
               ))}
             </div>
 
             <Separator />
-
+            
             <div className="space-y-2">
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>{subtotal.toLocaleString()} ETB</span>
               </div>
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping</span>
-                <span>{shippingCost === 0 ? 'Free' : `$${shippingCost.toFixed(2)}`}</span>
+                <span>{shippingCost === 0 ? 'Free' : `${shippingCost.toLocaleString()} ETB`}</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Estimated Tax</span>
-                <span>${tax.toFixed(2)}</span>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tax (15% VAT)</span>
+                <span>{tax.toLocaleString()} ETB</span>
               </div>
-              <div className="flex justify-between text-sm font-bold pt-2 border-t mt-2">
+              <Separator className="my-2" />
+              <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{total.toLocaleString()} ETB</span>
               </div>
             </div>
 
