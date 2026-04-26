@@ -14,7 +14,7 @@ export function Home() {
     const fetchData = async () => {
       try {
         let collections = await (blink.db as any).collections.list({
-          limit: 6,
+          limit: 10,
           where: { active: "1" }
         });
         
@@ -24,7 +24,7 @@ export function Home() {
         setFeaturedCollections(collections);
 
         let products = await (blink.db as any).products.list({
-          limit: 12,
+          limit: 20,
           orderBy: { id: 'desc' },
           where: { active: "1" }
         });
