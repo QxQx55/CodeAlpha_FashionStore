@@ -109,7 +109,7 @@ export function Home() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {featuredCollections.length > 0 ? (
             featuredCollections.map((collection) => (
               <Link 
@@ -172,10 +172,10 @@ export function Home() {
             <div className="space-y-8 max-w-xl">
               <span className="text-accent text-xs font-bold uppercase tracking-widest">Our Story</span>
               <h2 className="font-serif text-4xl md:text-5xl font-bold leading-tight uppercase tracking-tight">
-                Crafted with intention, designed for the long haul.
+                Where tradition meets contemporary style.
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                We believe in clothing that lasts. Not just in durability, but in style. Our pieces are designed to be the backbone of your wardrobe, evolving with you through seasons and years.
+                Habesha is more than a brand — it's a celebration of Ethiopian heritage. From the intricate Tilf embroidery of our traditional wear to the clean lines of our modern pieces, every garment tells a story of craftsmanship passed down through generations.
               </p>
               <div className="pt-4">
                 <Button variant="link" className="px-0 text-sm font-bold uppercase tracking-widest hover:text-accent group" asChild>

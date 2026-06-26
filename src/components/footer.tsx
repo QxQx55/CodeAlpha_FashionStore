@@ -10,9 +10,9 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
           <div className="space-y-4">
-            <span className="font-serif text-2xl font-bold tracking-tighter uppercase">Vogue</span>
+            <span className="font-serif text-2xl font-bold tracking-tighter uppercase">Habesha</span>
             <p className="text-muted-foreground text-sm max-w-xs">
-              Redefining D2C fashion with a collection-first approach. Quality pieces designed for your everyday life.
+              Authentic Ethiopian fashion. Quality pieces crafted with tradition and style for your everyday life.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="hover:text-accent transition-colors"><Instagram className="h-5 w-5" /></a>
@@ -37,10 +37,10 @@ export function Footer() {
           <div className="space-y-4">
             <h3 className="font-medium uppercase tracking-wider text-xs">Support</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><button onClick={() => toast.info('Contact us at support@vogue.com')} className="hover:text-foreground transition-colors">Contact Us</button></li>
-              <li><button onClick={() => toast.info('Free shipping on orders over $150. Returns accepted within 30 days.')} className="hover:text-foreground transition-colors">Shipping & Returns</button></li>
+              <li><button onClick={() => toast.info('Contact us at support@habesha.com')} className="hover:text-foreground transition-colors">Contact Us</button></li>
+              <li><button onClick={() => toast.info('Free shipping on orders over 5000 ETB. Returns accepted within 30 days.')} className="hover:text-foreground transition-colors">Shipping & Returns</button></li>
               <li><button onClick={() => toast.info('Check each product page for detailed size guides.')} className="hover:text-foreground transition-colors">Size Guide</button></li>
-              <li><button onClick={() => toast.info('For questions, email support@vogue.com or visit your Account page.')} className="hover:text-foreground transition-colors">FAQs</button></li>
+              <li><button onClick={() => toast.info('For questions, email support@habesha.com or visit your Account page.')} className="hover:text-foreground transition-colors">FAQs</button></li>
             </ul>
           </div>
 
@@ -49,7 +49,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center text-xs text-muted-foreground space-y-4 md:space-y-0">
-          <p>© 2026 Vogue Commerce. All rights reserved.</p>
+          <p>© 2026 Habesha Commerce. All rights reserved.</p>
           <div className="flex space-x-8">
             <a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-foreground transition-colors">Terms of Service</a>
