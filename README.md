@@ -18,7 +18,18 @@ Open [http://localhost:3000](http://localhost:3000). The development command sta
 
 Create an account to add products to your cart and place orders. Checkout uses cash on delivery; online payment is not configured, and the app does not request or store card details.
 
-To enable the existing admin screens, set `ADMIN_EMAIL` to an email address before creating that account. The matching new account is granted administrator access. Do not expose the development server publicly.
+To enable the admin screens, set `ADMIN_EMAIL` to the store owner's email before starting the server. Create an account with that email, or restart the server to promote an existing account with that email. The admin portal is available at `/admin/products`.
+
+For example, in Windows PowerShell, set the email before starting the dev server:
+
+```powershell
+$env:ADMIN_EMAIL = "owner@example.com"
+npm run dev
+```
+
+Administrators can add a product in **Manage Store → Products → Add Product**. Select an existing category, enter a price and starting stock, and choose whether the listing is active. Saving writes the product and its purchasable default variant to SQLite in one transaction. Active products are available from the catalog immediately. Editing a product's base price updates variants that still use that base price.
+
+Do not expose the development server publicly.
 
 ## Verification
 
