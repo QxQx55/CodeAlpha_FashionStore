@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/components/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 
 export function AccountOverview() {
   const { user } = useAuth();
@@ -14,14 +14,14 @@ export function AccountOverview() {
     const fetchData = async () => {
       if (!user) return;
       try {
-        const orders = await (blink.db as any).orders.list({
+        const orders = await (storeApi.db as any).orders.list({
           where: { userId: user.id },
           orderBy: { createdAt: 'desc' },
           limit: 3
         });
         setRecentOrders(orders);
 
-        const wishlist = await (blink.db as any).wishlist.list({
+        const wishlist = await (storeApi.db as any).wishlist.list({
           where: { userId: user.id }
         });
         setWishlistCount(wishlist.length);

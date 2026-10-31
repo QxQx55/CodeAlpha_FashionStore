@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -55,14 +55,14 @@ export function ProductVariants() {
   const fetchData = async () => {
     if (!productId) return;
     try {
-      const products = await (blink.db as any).products.list({ where: { id: productId } });
+      const products = await (storeApi.db as any).products.list({ where: { id: productId } });
       if (products.length === 0) {
         navigate('/admin/products');
         return;
       }
       setProduct(products[0]);
 
-      const variantData = await (blink.db as any).productVariants.list({ 
+      const variantData = await (storeApi.db as any).productVariants.list({ 
         where: { productId } 
       });
       setVariants(variantData);
@@ -93,10 +93,10 @@ export function ProductVariants() {
       };
 
       if (editingVariant) {
-        await (blink.db as any).productVariants.update(editingVariant.id, variantData);
+        await (storeApi.db as any).productVariants.update(editingVariant.id, variantData);
         toast.success('Variant updated');
       } else {
-        await (blink.db as any).productVariants.create(variantData);
+        await (storeApi.db as any).productVariants.create(variantData);
         toast.success('Variant created');
       }
 
@@ -137,7 +137,7 @@ export function ProductVariants() {
 
   const handleDelete = async (id: string) => {
     try {
-      await (blink.db as any).productVariants.delete(id);
+      await (storeApi.db as any).productVariants.delete(id);
       toast.success('Variant deleted');
       fetchData();
     } catch (error) {
@@ -149,7 +149,7 @@ export function ProductVariants() {
     const sizes = ['XS', 'S', 'M', 'L', 'XL'];
     try {
       for (const size of sizes) {
-        await (blink.db as any).productVariants.create({
+        await (storeApi.db as any).productVariants.create({
           productId,
           size,
           price: product.basePrice,

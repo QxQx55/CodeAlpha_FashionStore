@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { blink, type StoreUser } from '@/lib/blink';
+import { storeApi, type StoreUser } from '@/lib/store-api';
 
 interface AuthContextType {
   user: StoreUser | null;
@@ -18,11 +18,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = blink.auth.onAuthStateChanged(({ user: nextUser, isLoading: loading }) => {
+    const unsubscribe = storeApi.auth.onAuthStateChanged(({ user: nextUser, isLoading: loading }) => {
       setUser(nextUser);
       setIsLoading(loading);
     });
-    blink.auth.getCurrentUser()
+    storeApi.auth.getCurrentUser()
       .then((currentUser) => {
         setUser(currentUser);
         setIsLoading(false);
@@ -34,14 +34,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const login = (redirectUrl?: string) => blink.auth.login(redirectUrl);
+  const login = (redirectUrl?: string) => storeApi.auth.login(redirectUrl);
   const signUp = async (data: { email: string; password: string; displayName: string }) => {
-    await blink.auth.signUp(data);
+    await storeApi.auth.signUp(data);
   };
   const signIn = async (email: string, pass: string) => {
-    await blink.auth.signInWithEmail(email, pass);
+    await storeApi.auth.signInWithEmail(email, pass);
   };
-  const logout = () => blink.auth.signOut();
+  const logout = () => storeApi.auth.signOut();
 
   return (
     <AuthContext.Provider

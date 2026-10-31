@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -40,7 +40,7 @@ export function AdminOrders() {
 
   const fetchOrders = async () => {
     try {
-      const data = await (blink.db as any).orders.list({ orderBy: { createdAt: 'desc' } });
+      const data = await (storeApi.db as any).orders.list({ orderBy: { createdAt: 'desc' } });
       setOrders(data);
     } catch (error) {
       console.error(error);
@@ -55,7 +55,7 @@ export function AdminOrders() {
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     try {
-      await (blink.db as any).orders.update(orderId, { status: newStatus });
+      await (storeApi.db as any).orders.update(orderId, { status: newStatus });
       toast.success(`Order status updated to ${newStatus}`);
       fetchOrders();
     } catch (error) {

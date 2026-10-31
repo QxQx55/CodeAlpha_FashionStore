@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,9 +49,9 @@ export function AdminOverview() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const orders = await (blink.db as any).orders.list();
-        const products = await (blink.db as any).products.list({ where: { active: "1" } });
-        const collections = await (blink.db as any).collections.list({ where: { active: "1" } });
+        const orders = await (storeApi.db as any).orders.list();
+        const products = await (storeApi.db as any).products.list({ where: { active: "1" } });
+        const collections = await (storeApi.db as any).collections.list({ where: { active: "1" } });
 
         const totalSales = (orders as any[]).reduce((sum, order) => sum + Number(order.totalAmount), 0);
         setRecentOrders(orders.slice(0, 5));
@@ -59,11 +59,11 @@ export function AdminOverview() {
         // Calculate sales by collection
         const salesByCollection: Record<string, number> = {};
         for (const order of orders) {
-          const orderItems = await (blink.db as any).orderItems.list({ where: { orderId: order.id } });
+          const orderItems = await (storeApi.db as any).orderItems.list({ where: { orderId: order.id } });
           for (const item of orderItems) {
-            const variants = await (blink.db as any).productVariants.list({ where: { id: item.variantId } });
+            const variants = await (storeApi.db as any).productVariants.list({ where: { id: item.variantId } });
             if (variants[0]) {
-              const prods = await (blink.db as any).products.list({ where: { id: variants[0].productId } });
+              const prods = await (storeApi.db as any).products.list({ where: { id: variants[0].productId } });
               if (prods[0]) {
                 const collId = prods[0].collectionId || 'uncategorized';
                 salesByCollection[collId] = (salesByCollection[collId] || 0) + Number(item.price) * item.quantity;
@@ -74,7 +74,7 @@ export function AdminOverview() {
 
         const collSalesArr = await Promise.all(
           Object.entries(salesByCollection).map(async ([collId, amount]) => {
-            const coll = await (blink.db as any).collections.list({ where: { id: collId } });
+            const coll = await (storeApi.db as any).collections.list({ where: { id: collId } });
             return {
               id: collId,
               name: coll[0]?.name || 'Uncategorized',

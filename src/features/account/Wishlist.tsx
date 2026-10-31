@@ -6,7 +6,7 @@ import {
   Heart, 
   Trash2
 } from 'lucide-react';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { toast } from 'sonner';
 
 export function Wishlist() {
@@ -17,13 +17,13 @@ export function Wishlist() {
   const fetchWishlist = async () => {
     if (!user) return;
     try {
-      const wishlist = await (blink.db as any).wishlist.list({
+      const wishlist = await (storeApi.db as any).wishlist.list({
         where: { userId: user.id }
       });
 
       const items = await Promise.all(
         wishlist.map(async (item: any) => {
-          const products = await (blink.db as any).products.list({
+          const products = await (storeApi.db as any).products.list({
             where: { id: item.productId }
           });
           return products[0] ? { ...item, product: products[0] } : null;
@@ -44,7 +44,7 @@ export function Wishlist() {
 
   const removeFromWishlist = async (wishlistId: string) => {
     try {
-      await (blink.db as any).wishlist.delete(wishlistId);
+      await (storeApi.db as any).wishlist.delete(wishlistId);
       setWishlistItems(prev => prev.filter(item => item.id !== wishlistId));
       toast.success('Removed from wishlist');
     } catch (error) {

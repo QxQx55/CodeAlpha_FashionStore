@@ -10,7 +10,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -36,7 +36,7 @@ export function OrderDetail() {
     const fetchOrder = async () => {
       if (!user || !id) return;
       try {
-        const orders = await (blink.db as any).orders.list({
+        const orders = await (storeApi.db as any).orders.list({
           where: { id, userId: user.id }
         });
         
@@ -47,21 +47,21 @@ export function OrderDetail() {
         
         setOrder(orders[0]);
 
-        const items = await (blink.db as any).orderItems.list({
+        const items = await (storeApi.db as any).orderItems.list({
           where: { orderId: id }
         });
 
         // Enrich with product/variant info
         const enrichedItems = await Promise.all(
           items.map(async (item: any) => {
-            const variants = await (blink.db as any).productVariants.list({
+            const variants = await (storeApi.db as any).productVariants.list({
               where: { id: item.variantId }
             });
             const variant = variants[0];
             
             if (!variant) return { ...item, product: null, variant: null };
 
-            const products = await (blink.db as any).products.list({
+            const products = await (storeApi.db as any).products.list({
               where: { id: variant.productId }
             });
             const product = products[0];
@@ -94,7 +94,7 @@ export function OrderDetail() {
   const handleRequestReturn = async () => {
     if (!order || !user) return;
     try {
-      await (blink.db as any).returns.create({
+      await (storeApi.db as any).returns.create({
         orderId: order.id,
         userId: user.id,
         status: 'pending',

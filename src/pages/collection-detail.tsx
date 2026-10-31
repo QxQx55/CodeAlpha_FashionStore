@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { Button } from '@/components/ui/button';
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react';
 import { ProductCard } from '@/components/product-card';
@@ -75,9 +75,9 @@ export function CollectionDetail() {
       setLoading(true);
       try {
         const [collectionData, categoryData, variantData] = await Promise.all([
-          (blink.db as any).collections.list({ where: { slug } }),
-          (blink.db as any).collections.list({ where: { active: '1' } }),
-          (blink.db as any).productVariants.list({ limit: 200 }),
+          (storeApi.db as any).collections.list({ where: { slug } }),
+          (storeApi.db as any).collections.list({ where: { active: '1' } }),
+          (storeApi.db as any).productVariants.list({ limit: 200 }),
         ]);
         setCategories(categoryData);
 
@@ -133,7 +133,7 @@ export function CollectionDetail() {
         });
 
         if (slug === 'all') {
-          const allProducts = await (blink.db as any).products.list({
+          const allProducts = await (storeApi.db as any).products.list({
             where: { active: "1" }
           });
           
@@ -154,7 +154,7 @@ export function CollectionDetail() {
           const coll = collectionData[0];
           setCollection(coll);
 
-          const productData = await (blink.db as any).products.list({
+          const productData = await (storeApi.db as any).products.list({
             where: { collectionId: coll.id, active: "1" }
           });
 

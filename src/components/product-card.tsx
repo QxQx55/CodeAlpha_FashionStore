@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Heart } from 'lucide-react';
 import { useAuth } from '@/components/auth-provider';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { toast } from 'sonner';
 
 interface ProductCardProps {
@@ -29,7 +29,7 @@ export function ProductCard({ product }: ProductCardProps) {
     const checkWishlist = async () => {
       if (!user || !product) return;
       try {
-        const wishlist = await (blink.db as any).wishlist.list({
+        const wishlist = await (storeApi.db as any).wishlist.list({
           where: { userId: user.id, productId: product.id }
         });
         setIsInWishlist(wishlist.length > 0);
@@ -53,16 +53,16 @@ export function ProductCard({ product }: ProductCardProps) {
     setWishlistLoading(true);
     try {
       if (isInWishlist) {
-        const wishlist = await (blink.db as any).wishlist.list({
+        const wishlist = await (storeApi.db as any).wishlist.list({
           where: { userId: user.id, productId: product.id }
         });
         if (wishlist.length > 0) {
-          await (blink.db as any).wishlist.delete(wishlist[0].id);
+          await (storeApi.db as any).wishlist.delete(wishlist[0].id);
         }
         setIsInWishlist(false);
         toast.success('Removed from wishlist');
       } else {
-        await (blink.db as any).wishlist.create({
+        await (storeApi.db as any).wishlist.create({
           userId: user.id,
           productId: product.id
         });

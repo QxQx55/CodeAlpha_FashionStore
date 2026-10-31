@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { useCart } from '@/components/cart-provider';
 import { useAuth } from '@/components/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -40,7 +40,7 @@ export function ProductDetail() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const productData = await (blink.db as any).products.list({
+        const productData = await (storeApi.db as any).products.list({
           where: { slug }
         });
 
@@ -64,7 +64,7 @@ export function ProductDetail() {
           const p = productData[0];
           setProduct(p);
 
-          const variantData = await (blink.db as any).productVariants.list({
+          const variantData = await (storeApi.db as any).productVariants.list({
             where: { productId: p.id }
           });
           setVariants(variantData);
@@ -86,7 +86,7 @@ export function ProductDetail() {
     const checkWishlist = async () => {
       if (!user || !product) return;
       try {
-        const wishlist = await (blink.db as any).wishlist.list({
+        const wishlist = await (storeApi.db as any).wishlist.list({
           where: { userId: user.id, productId: product.id }
         });
         setIsInWishlist(wishlist.length > 0);
@@ -108,16 +108,16 @@ export function ProductDetail() {
     setWishlistLoading(true);
     try {
       if (isInWishlist) {
-        const wishlist = await (blink.db as any).wishlist.list({
+        const wishlist = await (storeApi.db as any).wishlist.list({
           where: { userId: user.id, productId: product.id }
         });
         if (wishlist.length > 0) {
-          await (blink.db as any).wishlist.delete(wishlist[0].id);
+          await (storeApi.db as any).wishlist.delete(wishlist[0].id);
         }
         setIsInWishlist(false);
         toast.success('Removed from wishlist');
       } else {
-        await (blink.db as any).wishlist.create({
+        await (storeApi.db as any).wishlist.create({
           userId: user.id,
           productId: product.id
         });

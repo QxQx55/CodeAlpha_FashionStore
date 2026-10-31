@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 
 type ShippingAddress = {
   email: string;
@@ -77,7 +77,7 @@ export function Checkout() {
 
     setLoading(true);
     try {
-      const order = await blink.api.createOrder(formData);
+      const order = await storeApi.api.createOrder(formData);
       await clearCart();
       toast.success('Order placed successfully!');
       navigate(`/account/orders/${order.id}`);

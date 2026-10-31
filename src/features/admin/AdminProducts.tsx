@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -94,14 +94,14 @@ export function AdminProducts() {
 
   const fetchProducts = async () => {
     try {
-      const data = await (blink.db as any).products.list();
-      const colls = await (blink.db as any).collections.list();
+      const data = await (storeApi.db as any).products.list();
+      const colls = await (storeApi.db as any).collections.list();
       setCollections(colls);
       
       // Enrich with variant counts
       const enriched = await Promise.all(
         data.map(async (p: any) => {
-          const variants = await (blink.db as any).productVariants.list({ where: { productId: p.id } });
+          const variants = await (storeApi.db as any).productVariants.list({ where: { productId: p.id } });
           const totalStock = variants.reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0);
           return { ...p, variantCount: variants.length, totalStock };
         })
@@ -148,10 +148,10 @@ export function AdminProducts() {
       };
 
       if (editingProduct) {
-        await (blink.db as any).products.update(editingProduct.id, productData);
+        await (storeApi.db as any).products.update(editingProduct.id, productData);
         toast.success('Product updated');
       } else {
-        await (blink.db as any).products.create({
+        await (storeApi.db as any).products.create({
           ...productData,
           initialStock: Number(formData.initialStock),
           sizes: formData.sizes.split(',').map((size) => size.trim()).filter(Boolean),
@@ -209,7 +209,7 @@ export function AdminProducts() {
 
   const handleDelete = async (id: string) => {
     try {
-      await (blink.db as any).products.delete(id);
+      await (storeApi.db as any).products.delete(id);
       toast.success('Product deleted');
       fetchProducts();
     } catch (error) {
@@ -219,7 +219,7 @@ export function AdminProducts() {
 
   const toggleActive = async (product: any) => {
     try {
-      await (blink.db as any).products.update(product.id, {
+      await (storeApi.db as any).products.update(product.id, {
         active: product.active === "1" ? "0" : "1"
       });
       fetchProducts();

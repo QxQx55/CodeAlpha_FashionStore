@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { useAuth } from './auth-provider';
 import { toast } from 'sonner';
 
@@ -45,17 +45,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const data = await (blink.db as any).cartItems.list();
+    const data = await (storeApi.db as any).cartItems.list();
 
     const enrichedItems = await Promise.all(
       (data as any[]).map(async (item) => {
-        const variantData = await (blink.db as any).productVariants.list({
+        const variantData = await (storeApi.db as any).productVariants.list({
           where: { id: item.variantId }
         });
         const v = variantData[0] as any;
         if (!v) return null;
 
-        const productData = await (blink.db as any).products.list({
+        const productData = await (storeApi.db as any).products.list({
           where: { id: v.productId }
         });
         const p = productData[0] as any;
@@ -104,21 +104,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addItem = async (variantId: string, quantity: number) => {
     if (!user) {
       toast.error('Please register or login to start shopping');
-      blink.auth.login(window.location.href);
+      storeApi.auth.login(window.location.href);
       return;
     }
 
     try {
-      const existing = await (blink.db as any).cartItems.list({
+      const existing = await (storeApi.db as any).cartItems.list({
         where: { userId: user.id, variantId: variantId }
       });
 
       if (existing.length > 0) {
-        await (blink.db as any).cartItems.update(existing[0].id, {
+        await (storeApi.db as any).cartItems.update(existing[0].id, {
           quantity: existing[0].quantity + quantity
         });
       } else {
-        await (blink.db as any).cartItems.create({
+        await (storeApi.db as any).cartItems.create({
           userId: user.id,
           variantId: variantId,
           quantity
@@ -135,7 +135,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeItem = async (itemId: string) => {
     try {
-      await (blink.db as any).cartItems.delete(itemId);
+      await (storeApi.db as any).cartItems.delete(itemId);
       await fetchCart();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to remove item.');
@@ -145,7 +145,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const updateQuantity = async (itemId: string, quantity: number) => {
     if (quantity < 1) return;
     try {
-      await (blink.db as any).cartItems.update(itemId, { quantity });
+      await (storeApi.db as any).cartItems.update(itemId, { quantity });
       await fetchCart();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update quantity.');

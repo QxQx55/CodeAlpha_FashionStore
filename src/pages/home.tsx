@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { ProductCard } from '@/components/product-card';
 import { MOCK_COLLECTIONS, MOCK_PRODUCTS } from '@/lib/mock-data';
 
@@ -13,7 +13,7 @@ export function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        let collections = await (blink.db as any).collections.list({
+        let collections = await (storeApi.db as any).collections.list({
           limit: 10,
           where: { active: "1" }
         });
@@ -23,7 +23,7 @@ export function Home() {
         }
         setFeaturedCollections(collections);
 
-        let products = await (blink.db as any).products.list({
+        let products = await (storeApi.db as any).products.list({
           limit: 20,
           orderBy: { id: 'desc' },
           where: { active: "1" }
@@ -40,7 +40,7 @@ export function Home() {
             if (p.imageUrl) {
               return { ...p, images: [p.imageUrl], imageUrl: p.imageUrl };
             }
-            const variants = await (blink.db as any).productVariants.list({
+            const variants = await (storeApi.db as any).productVariants.list({
               where: { productId: p.id },
               limit: 1
             });

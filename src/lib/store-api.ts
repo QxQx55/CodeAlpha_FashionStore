@@ -80,7 +80,7 @@ const db = Object.fromEntries(resourceNames.map((resource) => [
   },
 ])) as Record<typeof resourceNames[number], any>;
 
-export const blink = {
+export const storeApi = {
   db,
   api: {
     createOrder: (shippingAddress: Record<string, string>) => apiRequest<any>('/api/checkout', {

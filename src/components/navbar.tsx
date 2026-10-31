@@ -6,7 +6,7 @@ import { useAuth } from './auth-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -28,7 +28,7 @@ export function Navbar() {
   useEffect(() => {
     const fetchCollections = async () => {
       try {
-        const data = await (blink.db as any).collections.list({
+        const data = await (storeApi.db as any).collections.list({
           where: { active: "1" }
         });
         setCollections(data);

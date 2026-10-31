@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,10 +47,10 @@ export function AdminCollections() {
 
   const fetchCollections = async () => {
     try {
-      const data = await (blink.db as any).collections.list();
+      const data = await (storeApi.db as any).collections.list();
       const enriched = await Promise.all(
         data.map(async (c: any) => {
-          const products = await (blink.db as any).products.list({ where: { collectionId: c.id } });
+          const products = await (storeApi.db as any).products.list({ where: { collectionId: c.id } });
           return { ...c, productCount: products.length };
         })
       );
@@ -78,10 +78,10 @@ export function AdminCollections() {
       };
 
       if (editingCollection) {
-        await (blink.db as any).collections.update(editingCollection.id, collData);
+        await (storeApi.db as any).collections.update(editingCollection.id, collData);
         toast.success('Collection updated');
       } else {
-        await (blink.db as any).collections.create({ ...collData, userId: 'admin' });
+        await (storeApi.db as any).collections.create({ ...collData, userId: 'admin' });
         toast.success('Collection created');
       }
 
@@ -112,7 +112,7 @@ export function AdminCollections() {
 
   const handleDelete = async (id: string) => {
     try {
-      await (blink.db as any).collections.delete(id);
+      await (storeApi.db as any).collections.delete(id);
       toast.success('Collection deleted');
       fetchCollections();
     } catch (error) {

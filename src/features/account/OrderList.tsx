@@ -11,7 +11,7 @@ import {
   Clock,
   X
 } from 'lucide-react';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 
 export function OrderList() {
   const { user } = useAuth();
@@ -22,7 +22,7 @@ export function OrderList() {
     const fetchOrders = async () => {
       if (!user) return;
       try {
-        const data = await (blink.db as any).orders.list({
+        const data = await (storeApi.db as any).orders.list({
           where: { userId: user.id },
           orderBy: { createdAt: 'desc' }
         });

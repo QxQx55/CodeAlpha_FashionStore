@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { blink } from '@/lib/blink';
+import { storeApi } from '@/lib/store-api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -26,10 +26,10 @@ export function AdminReturns() {
 
   const fetchReturns = async () => {
     try {
-      const data = await (blink.db as any).returns.list({ orderBy: { createdAt: 'desc' } });
+      const data = await (storeApi.db as any).returns.list({ orderBy: { createdAt: 'desc' } });
       const enriched = await Promise.all(
         data.map(async (ret: any) => {
-          const orders = await (blink.db as any).orders.list({ where: { id: ret.orderId } });
+          const orders = await (storeApi.db as any).orders.list({ where: { id: ret.orderId } });
           return { ...ret, order: orders[0] };
         })
       );
@@ -47,7 +47,7 @@ export function AdminReturns() {
 
   const updateStatus = async (returnId: string, newStatus: string) => {
     try {
-      await (blink.db as any).returns.update(returnId, { status: newStatus });
+      await (storeApi.db as any).returns.update(returnId, { status: newStatus });
       toast.success(`Return status updated to ${newStatus}`);
       fetchReturns();
     } catch (error) {
