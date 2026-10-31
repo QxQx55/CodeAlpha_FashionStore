@@ -47,6 +47,28 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+const audienceOptions = [
+  { value: 'men', label: 'Men' },
+  { value: 'women', label: 'Women' },
+  { value: 'unisex', label: 'Unisex' },
+  { value: 'kids', label: 'Kids' },
+];
+
+function defaultSizesForCategory(category?: { slug?: string }) {
+  if (category?.slug === 'shoes') return '38, 39, 40, 41, 42, 43, 44';
+  if (category?.slug === 'kids') return '2T, 3T, 4T, 5T, 6T';
+  if (category?.slug === 'accessories') return 'One Size';
+  return 'XS, S, M, L, XL';
+}
+
+function makeSlug(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 export function AdminProducts() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,12 +76,16 @@ export function AdminProducts() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [collections, setCollections] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
     description: '',
     collectionId: '',
+    gender: 'unisex',
+    sizes: 'XS, S, M, L, XL',
     basePrice: '',
+    initialStock: '25',
     imageUrl: '',
     sizeGuide: '',
     fitNotes: '',
@@ -83,6 +109,7 @@ export function AdminProducts() {
       setProducts(enriched);
     } catch (error) {
       console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load products.');
     } finally {
       setLoading(false);
     }
@@ -94,13 +121,26 @@ export function AdminProducts() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editingProduct && !formData.collectionId) {
+      toast.error('Choose a product category before saving.');
+      return;
+    }
+
+    const basePrice = Number(formData.basePrice);
+    if (!Number.isFinite(basePrice) || basePrice <= 0) {
+      toast.error('Enter a product price greater than zero.');
+      return;
+    }
+
+    setSaving(true);
     try {
       const productData = {
         name: formData.name,
-        slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-'),
+        slug: makeSlug(formData.slug || formData.name),
         description: formData.description,
         collectionId: formData.collectionId || null,
-        basePrice: parseFloat(formData.basePrice),
+        gender: formData.gender,
+        basePrice,
         imageUrl: formData.imageUrl,
         sizeGuide: formData.sizeGuide,
         fitNotes: formData.fitNotes,
@@ -113,18 +153,21 @@ export function AdminProducts() {
       } else {
         await (blink.db as any).products.create({
           ...productData,
-          userId: 'admin'
+          initialStock: Number(formData.initialStock),
+          sizes: formData.sizes.split(',').map((size) => size.trim()).filter(Boolean),
         });
-        toast.success('Product created');
       }
 
+      await fetchProducts();
+      if (!editingProduct) toast.success('Product saved and published to the storefront.');
       setIsDialogOpen(false);
       setEditingProduct(null);
       resetForm();
-      fetchProducts();
     } catch (error) {
-      toast.error('Failed to save product');
+      toast.error(error instanceof Error ? error.message : 'Failed to save product.');
       console.error(error);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -134,7 +177,10 @@ export function AdminProducts() {
       slug: '',
       description: '',
       collectionId: '',
+      gender: 'unisex',
+      sizes: 'XS, S, M, L, XL',
       basePrice: '',
+      initialStock: '25',
       imageUrl: '',
       sizeGuide: '',
       fitNotes: '',
@@ -149,7 +195,10 @@ export function AdminProducts() {
       slug: product.slug,
       description: product.description || '',
       collectionId: product.collectionId || '',
+      gender: product.gender || 'unisex',
+      sizes: '',
       basePrice: String(product.basePrice),
+      initialStock: '25',
       imageUrl: product.imageUrl || '',
       sizeGuide: product.sizeGuide || '',
       fitNotes: product.fitNotes || '',
@@ -201,7 +250,9 @@ export function AdminProducts() {
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
-              <DialogDescription>Fill in the product details below.</DialogDescription>
+              <DialogDescription>
+                Add a product to a category and set its price. New active products appear in the storefront as soon as they are saved.
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-4">
@@ -232,10 +283,17 @@ export function AdminProducts() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-widest">Collection</Label>
-                  <Select value={formData.collectionId} onValueChange={(v) => setFormData(prev => ({ ...prev, collectionId: v }))}>
+                  <Label className="text-xs uppercase tracking-widest">Category *</Label>
+                  <Select
+                    value={formData.collectionId}
+                    onValueChange={(value) => setFormData((previous) => ({
+                      ...previous,
+                      collectionId: value,
+                      ...(!editingProduct ? { sizes: defaultSizesForCategory(collections.find((collection) => collection.id === value)) } : {}),
+                    }))}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select collection" />
+                      <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
                       {collections.map(c => (
@@ -245,9 +303,10 @@ export function AdminProducts() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-widest">Base Price (ETB) *</Label>
+                  <Label className="text-xs uppercase tracking-widest">Price (ETB) *</Label>
                   <Input 
                     type="number"
+                    min="0.01"
                     step="0.01"
                     value={formData.basePrice}
                     onChange={(e) => setFormData(prev => ({ ...prev, basePrice: e.target.value }))}
@@ -255,6 +314,52 @@ export function AdminProducts() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-widest">For *</Label>
+                  <Select
+                    value={formData.gender}
+                    onValueChange={(gender) => setFormData((previous) => ({ ...previous, gender }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select audience" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {audienceOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-widest">Sizes *</Label>
+                  <Input
+                    value={formData.sizes}
+                    onChange={(event) => setFormData((previous) => ({ ...previous, sizes: event.target.value }))}
+                    placeholder="XS, S, M, L, XL"
+                    disabled={Boolean(editingProduct)}
+                    required={!editingProduct}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {editingProduct ? 'Manage existing sizes from the product’s Variants menu.' : 'Comma-separated sizes; each size gets its own stock option.'}
+                  </p>
+                </div>
+              </div>
+              {!editingProduct && (
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-widest">Starting stock</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="1000000"
+                    step="1"
+                    value={formData.initialStock}
+                    onChange={(e) => setFormData(prev => ({ ...prev, initialStock: e.target.value }))}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">A default purchasable product option will be created with this stock.</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-widest">Image URL</Label>
                 <Input 
@@ -286,7 +391,9 @@ export function AdminProducts() {
                 />
                 <Label className="text-xs">Active (visible on storefront)</Label>
               </div>
-              <Button type="submit" className="w-full">{editingProduct ? 'Update Product' : 'Create Product'}</Button>
+              <Button type="submit" className="w-full" disabled={saving}>
+                {saving ? 'Saving...' : editingProduct ? 'Update Product' : 'Save and Publish Product'}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -308,6 +415,7 @@ export function AdminProducts() {
             <TableRow>
               <TableHead className="w-16"></TableHead>
               <TableHead>Product</TableHead>
+              <TableHead>For</TableHead>
               <TableHead>Collection</TableHead>
               <TableHead className="text-right">Price</TableHead>
               <TableHead className="text-center">Variants</TableHead>
@@ -319,7 +427,7 @@ export function AdminProducts() {
           <TableBody>
             {filteredProducts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No products found
                 </TableCell>
               </TableRow>
@@ -341,6 +449,7 @@ export function AdminProducts() {
                       <p className="text-[10px] text-muted-foreground">{product.slug}</p>
                     </div>
                   </TableCell>
+                  <TableCell className="text-xs capitalize">{product.gender || 'unisex'}</TableCell>
                   <TableCell className="text-xs">
                     {collections.find(c => c.id === product.collectionId)?.name || '-'}
                   </TableCell>

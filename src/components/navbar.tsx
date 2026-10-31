@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingBag, User, Heart, Search, Menu, X } from 'lucide-react';
+import { ShoppingBag, User, Heart, Search, Menu, X, Settings } from 'lucide-react';
 import { useCart } from './cart-provider';
 import { useAuth } from './auth-provider';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [collections, setCollections] = useState<any[]>([]);
   const { totalCount, setIsOpen: setIsCartOpen } = useCart();
-  const { isAuthenticated, login } = useAuth();
+  const { user, isAuthenticated, login } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -102,6 +102,11 @@ export function Navbar() {
             <Link to="/account" className="p-2 hover:text-accent transition-colors">
               <User className="h-5 w-5" />
             </Link>
+            {user?.isAdmin && (
+              <Link to="/admin/products" aria-label="Manage store" title="Manage store" className="p-2 hover:text-accent transition-colors">
+                <Settings className="h-5 w-5" />
+              </Link>
+            )}
             <Link to="/account/wishlist" className="hidden sm:block p-2 hover:text-accent transition-colors">
               <Heart className="h-5 w-5" />
             </Link>
@@ -154,6 +159,9 @@ export function Navbar() {
             ))}
             <Link to="/account/wishlist" className="block text-lg font-medium border-b pb-2">Wishlist</Link>
             <Link to="/account" className="block text-lg font-medium border-b pb-2">Account</Link>
+            {user?.isAdmin && (
+              <Link to="/admin/products" className="block text-lg font-medium border-b pb-2">Manage Store</Link>
+            )}
             {/* Mobile search */}
             <form onSubmit={handleSearch} className="flex items-center space-x-2 border-b pb-2">
               <Input
