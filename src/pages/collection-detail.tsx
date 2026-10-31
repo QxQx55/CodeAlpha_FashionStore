@@ -28,9 +28,12 @@ export function CollectionDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [collection, setCollection] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'newest');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
+  const [selectedGenders, setSelectedGenders] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -39,6 +42,8 @@ export function CollectionDetail() {
   const availableFilters = useMemo(() => {
     const sizes = new Set<string>();
     const colors = new Set<string>();
+    const genders = new Set<string>();
+    const categoryIds = new Set<string>();
     let minPrice = Infinity;
     let maxPrice = 0;
 
@@ -46,15 +51,17 @@ export function CollectionDetail() {
       const price = Number(p.basePrice);
       if (price < minPrice) minPrice = price;
       if (price > maxPrice) maxPrice = price;
+      if (p.gender) genders.add(p.gender);
+      if (p.collectionId) categoryIds.add(p.collectionId);
+      (p.sizes || []).forEach((size: string) => sizes.add(size));
+      (p.colors || []).forEach((color: string) => colors.add(color));
     });
 
-    // Typically you'd also fetch variants, but for now use common sizes
-    ['XS', 'S', 'M', 'L', 'XL', 'XXL'].forEach(s => sizes.add(s));
-    ['Black', 'White', 'Navy', 'Gray', 'Beige', 'Brown'].forEach(c => colors.add(c));
-
     return {
-      sizes: Array.from(sizes),
-      colors: Array.from(colors),
+      sizes: Array.from(sizes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      colors: Array.from(colors).sort(),
+      genders: Array.from(genders).sort(),
+      categoryIds: Array.from(categoryIds),
       priceRange: [Math.floor(minPrice || 0), Math.ceil(maxPrice || 1000)] as [number, number]
     };
   }, [products]);
@@ -67,21 +74,63 @@ export function CollectionDetail() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        let collectionData = await (blink.db as any).collections.list({
-          where: { slug }
-        });
-        
+        const [collectionData, categoryData, variantData] = await Promise.all([
+          (blink.db as any).collections.list({ where: { slug } }),
+          (blink.db as any).collections.list({ where: { active: '1' } }),
+          (blink.db as any).productVariants.list({ limit: 200 }),
+        ]);
+        setCategories(categoryData);
+
         if (collectionData.length === 0 && slug !== 'all') {
-          // Try to find in mock data
           const mockColl = MOCK_COLLECTIONS.find(c => c.slug === slug);
           if (mockColl) {
             setCollection(mockColl);
-            const mockProducts = MOCK_PRODUCTS.filter(p => p.collectionId === mockColl.id);
+            const mockProducts = MOCK_PRODUCTS
+              .filter(p => p.collectionId === mockColl.id)
+              .map((product) => ({
+                ...product,
+                gender: mockColl.slug === 'men' || mockColl.slug === 'women' || mockColl.slug === 'kids'
+                  ? mockColl.slug
+                  : 'unisex',
+                sizes: ['One Size'],
+                colors: [],
+              }));
             setProducts(mockProducts);
             setLoading(false);
             return;
           }
         }
+
+        const enrichProducts = (productData: any[]) => productData.map((product) => {
+          const variants = variantData.filter((variant: any) => variant.productId === product.id);
+          let variantImages: string[] = [];
+          for (const variant of variants) {
+            try {
+              const parsedImages = JSON.parse(variant.imageUrls || '[]');
+              if (Array.isArray(parsedImages)) variantImages.push(...parsedImages);
+              else if (typeof parsedImages === 'string') variantImages.push(parsedImages);
+            } catch {
+              if (variant.imageUrls) variantImages.push(variant.imageUrls);
+            }
+          }
+          const images = product.imageUrl ? [product.imageUrl] : variantImages;
+          const category = categoryData.find((item: any) => item.id === product.collectionId);
+          const inferredGender = ['men', 'women', 'kids'].includes(category?.slug)
+            ? category.slug
+            : category?.slug === 'traditional' && /women/i.test(product.name)
+              ? 'women'
+              : category?.slug === 'traditional' && /men/i.test(product.name)
+                ? 'men'
+                : 'unisex';
+          return {
+            ...product,
+            gender: product.gender || inferredGender,
+            images,
+            imageUrl: images[0] || '',
+            sizes: Array.from(new Set(variants.filter((variant: any) => Number(variant.stock) > 0).map((variant: any) => variant.size || 'One Size'))),
+            colors: Array.from(new Set(variants.map((variant: any) => variant.color).filter(Boolean))),
+          };
+        });
 
         if (slug === 'all') {
           const allProducts = await (blink.db as any).products.list({
@@ -95,17 +144,7 @@ export function CollectionDetail() {
             return;
           }
 
-          const enriched = await Promise.all(
-            allProducts.map(async (p: any) => {
-              if (p.imageUrl) return { ...p, images: [p.imageUrl], imageUrl: p.imageUrl };
-              const variants = await (blink.db as any).productVariants.list({ where: { productId: p.id }, limit: 1 });
-              const v = variants[0];
-              let imgs = [];
-              try { imgs = JSON.parse(v?.imageUrls || '[]'); } catch { imgs = v?.imageUrls ? [v.imageUrls] : []; }
-              return { ...p, images: imgs, imageUrl: imgs[0] || '' };
-            })
-          );
-          setProducts(enriched);
+          setProducts(enrichProducts(allProducts));
           setCollection({ name: 'All Products', description: 'Browse our entire catalog of premium fashion.' });
           setLoading(false);
           return;
@@ -119,27 +158,7 @@ export function CollectionDetail() {
             where: { collectionId: coll.id, active: "1" }
           });
 
-          // Use product's main image or fallback to first variant
-          const enrichedProducts = await Promise.all(
-            productData.map(async (p: any) => {
-              if (p.imageUrl) {
-                return { ...p, images: [p.imageUrl], imageUrl: p.imageUrl };
-              }
-              const variants = await (blink.db as any).productVariants.list({
-                where: { productId: p.id },
-                limit: 1
-              });
-              const firstVariant = variants[0];
-              let images = [];
-              try {
-                images = JSON.parse(firstVariant?.imageUrls || '[]');
-              } catch (e) {
-                images = firstVariant?.imageUrls ? [firstVariant.imageUrls] : [];
-              }
-              return { ...p, images, imageUrl: images[0] || '' };
-            })
-          );
-          setProducts(enrichedProducts);
+          setProducts(enrichProducts(productData));
         }
       } catch (error) {
         console.error('Failed to fetch collection detail:', error);
@@ -164,6 +183,22 @@ export function CollectionDetail() {
         p.name.toLowerCase().includes(q) || 
         (p.description && p.description.toLowerCase().includes(q))
       );
+    }
+
+    if (selectedGenders.length > 0) {
+      result = result.filter((product) => selectedGenders.includes(product.gender || 'unisex'));
+    }
+
+    if (selectedCategories.length > 0) {
+      result = result.filter((product) => selectedCategories.includes(product.collectionId));
+    }
+
+    if (selectedSizes.length > 0) {
+      result = result.filter((product) => selectedSizes.some((size) => (product.sizes || []).includes(size)));
+    }
+
+    if (selectedColors.length > 0) {
+      result = result.filter((product) => selectedColors.some((color) => (product.colors || []).includes(color)));
     }
 
     // Filter by price range
@@ -194,7 +229,7 @@ export function CollectionDetail() {
     }
 
     return result;
-  }, [products, sortBy, priceRange, selectedSizes, selectedColors, searchQueryParam]);
+  }, [products, sortBy, priceRange, selectedGenders, selectedCategories, selectedSizes, selectedColors, searchQueryParam]);
 
   const handleSortChange = (newSort: string) => {
     setSortBy(newSort);
@@ -206,11 +241,14 @@ export function CollectionDetail() {
 
   const clearFilters = () => {
     setPriceRange([availableFilters.priceRange[0], availableFilters.priceRange[1]]);
+    setSelectedGenders([]);
+    setSelectedCategories([]);
     setSelectedSizes([]);
     setSelectedColors([]);
   };
 
-  const hasActiveFilters = selectedSizes.length > 0 || selectedColors.length > 0 || 
+  const hasActiveFilters = selectedGenders.length > 0 || selectedCategories.length > 0 ||
+    selectedSizes.length > 0 || selectedColors.length > 0 ||
     (priceRange[0] !== availableFilters.priceRange[0] || priceRange[1] !== availableFilters.priceRange[1]);
 
   if (loading) {
@@ -269,6 +307,54 @@ export function CollectionDetail() {
                 </SheetTitle>
               </SheetHeader>
               <div className="space-y-8 py-6">
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest">Shop by audience</h3>
+                  <div className="space-y-2">
+                    {availableFilters.genders.map((gender) => (
+                      <div key={gender} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`gender-${gender}`}
+                          checked={selectedGenders.includes(gender)}
+                          onCheckedChange={(checked) => setSelectedGenders((previous) => (
+                            checked
+                              ? [...previous, gender]
+                              : previous.filter((item) => item !== gender)
+                          ))}
+                        />
+                        <Label htmlFor={`gender-${gender}`} className="cursor-pointer text-sm capitalize">
+                          {gender === 'kids' ? 'Kids' : gender}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {slug === 'all' && (
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest">Product type</h3>
+                    <div className="space-y-2">
+                      {categories
+                        .filter((category) => availableFilters.categoryIds.includes(category.id))
+                        .map((category) => (
+                          <div key={category.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`category-${category.id}`}
+                              checked={selectedCategories.includes(category.id)}
+                              onCheckedChange={(checked) => setSelectedCategories((previous) => (
+                                checked
+                                  ? [...previous, category.id]
+                                  : previous.filter((item) => item !== category.id)
+                              ))}
+                            />
+                            <Label htmlFor={`category-${category.id}`} className="cursor-pointer text-sm">
+                              {category.name}
+                            </Label>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Price Range Filter */}
                 <div className="space-y-4">
                   <h3 className="text-xs font-bold uppercase tracking-widest">Price Range</h3>
@@ -405,6 +491,25 @@ export function CollectionDetail() {
         <section className="container mx-auto px-4 mb-8">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">Active Filters:</span>
+            {selectedGenders.map((gender) => (
+              <button
+                key={gender}
+                onClick={() => setSelectedGenders((previous) => previous.filter((item) => item !== gender))}
+                className="inline-flex items-center gap-1 rounded-sm bg-secondary px-2 py-1 text-xs hover:bg-secondary/80"
+              >
+                For: {gender === 'kids' ? 'Kids' : gender} <X className="h-3 w-3" />
+              </button>
+            ))}
+            {selectedCategories.map((categoryId) => (
+              <button
+                key={categoryId}
+                onClick={() => setSelectedCategories((previous) => previous.filter((item) => item !== categoryId))}
+                className="inline-flex items-center gap-1 rounded-sm bg-secondary px-2 py-1 text-xs hover:bg-secondary/80"
+              >
+                Type: {categories.find((category) => category.id === categoryId)?.name || categoryId}
+                <X className="h-3 w-3" />
+              </button>
+            ))}
             {selectedSizes.map(size => (
               <button
                 key={size}
