@@ -19,8 +19,8 @@ export function Register() {
     setLoading(true);
     try {
       await signUp({ email, password, displayName });
-      toast.success('Account created! Please sign in.');
-      navigate('/login');
+      toast.success('Account created. You are now signed in.');
+      navigate('/account');
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');
     } finally {
@@ -66,6 +66,7 @@ export function Register() {
             value={password} 
             onChange={(e) => setPassword(e.target.value)} 
             required 
+            minLength={8}
           />
         </div>
         <Button type="submit" className="w-full h-12 uppercase tracking-widest font-bold" disabled={loading}>

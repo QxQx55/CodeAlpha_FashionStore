@@ -188,7 +188,7 @@ export function ProductVariants() {
             {product.name} — Variants
           </h1>
           <p className="text-xs text-muted-foreground">
-            Base price: ${Number(product.basePrice).toFixed(2)} | {variants.length} variants
+            Base price: {Number(product.basePrice).toLocaleString()} ETB | {variants.length} variants
           </p>
         </div>
 
@@ -334,7 +334,7 @@ export function ProductVariants() {
                     <TableCell>{variant.color || '-'}</TableCell>
                     <TableCell>{variant.material || '-'}</TableCell>
                     <TableCell className="text-right font-bold">
-                      ${Number(variant.price || product.basePrice).toFixed(2)}
+                      {Number(variant.price || product.basePrice).toLocaleString()} ETB
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge 

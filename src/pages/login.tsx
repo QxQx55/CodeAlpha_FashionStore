@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/components/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,13 @@ export function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
-  const from = (location.state as any)?.from?.pathname || '/account';
+  const statePath = (location.state as any)?.from?.pathname;
+  const requestedPath = searchParams.get('redirectTo');
+  const from = requestedPath?.startsWith('/') && !requestedPath.startsWith('//')
+    ? requestedPath
+    : statePath || '/account';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

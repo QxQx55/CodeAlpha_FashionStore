@@ -45,63 +45,60 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    try {
-      const data = await (blink.db as any).cartItems.list({
-        where: { userId: user.id }
-      });
+    const data = await (blink.db as any).cartItems.list();
 
-      const enrichedItems = await Promise.all(
-        (data as any[]).map(async (item) => {
-          const variantData = await (blink.db as any).productVariants.list({
-            where: { id: item.variantId }
-          });
-          const v = variantData[0] as any;
-          if (!v) return null;
+    const enrichedItems = await Promise.all(
+      (data as any[]).map(async (item) => {
+        const variantData = await (blink.db as any).productVariants.list({
+          where: { id: item.variantId }
+        });
+        const v = variantData[0] as any;
+        if (!v) return null;
 
-          const productData = await (blink.db as any).products.list({
-            where: { id: v.productId }
-          });
-          const p = productData[0] as any;
-          if (!p) return null;
+        const productData = await (blink.db as any).products.list({
+          where: { id: v.productId }
+        });
+        const p = productData[0] as any;
+        if (!p) return null;
 
-          let images = [];
-          try {
-            images = JSON.parse(v.imageUrls || '[]');
-          } catch (e) {
-            images = v.imageUrls ? [v.imageUrls] : [];
+        let images = [];
+        try {
+          images = JSON.parse(v.imageUrls || '[]');
+        } catch {
+          images = v.imageUrls ? [v.imageUrls] : [];
+        }
+
+        if (images.length === 0 && p.imageUrl) {
+          images = [p.imageUrl];
+        }
+
+        return {
+          id: item.id,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          product: {
+            name: p.name,
+            image: images[0] || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop',
+            basePrice: p.basePrice
+          },
+          variant: {
+            size: v.size,
+            color: v.color,
+            price: v.price,
+            stock: v.stock
           }
+        };
+      })
+    );
 
-          if (images.length === 0 && p.imageUrl) {
-            images = [p.imageUrl];
-          }
-
-          return {
-            id: item.id,
-            variantId: item.variantId,
-            quantity: item.quantity,
-            product: {
-              name: p.name,
-              image: images[0] || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop',
-              basePrice: p.basePrice
-            },
-            variant: {
-              size: v.size,
-              color: v.color,
-              price: v.price,
-              stock: v.stock
-            }
-          };
-        })
-      );
-
-      setItems(enrichedItems.filter(Boolean) as CartItem[]);
-    } catch (error) {
-      console.error('Failed to fetch cart:', error);
-    }
+    setItems(enrichedItems.filter(Boolean) as CartItem[]);
   };
 
   useEffect(() => {
-    fetchCart();
+    fetchCart().catch((error) => {
+      console.error('Failed to fetch cart:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load your cart.');
+    });
   }, [user]);
 
   const addItem = async (variantId: string, quantity: number) => {
@@ -132,7 +129,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setIsOpen(true);
       toast.success('Added to cart');
     } catch (error) {
-      toast.error('Failed to add item to cart');
+      toast.error(error instanceof Error ? error.message : 'Failed to add item to cart.');
     }
   };
 
@@ -141,7 +138,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       await (blink.db as any).cartItems.delete(itemId);
       await fetchCart();
     } catch (error) {
-      toast.error('Failed to remove item');
+      toast.error(error instanceof Error ? error.message : 'Failed to remove item.');
     }
   };
 
@@ -151,21 +148,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       await (blink.db as any).cartItems.update(itemId, { quantity });
       await fetchCart();
     } catch (error) {
-      toast.error('Failed to update quantity');
+      toast.error(error instanceof Error ? error.message : 'Failed to update quantity.');
     }
   };
 
   const clearCart = async () => {
-    if (!user) return;
-    try {
-      const data = await (blink.db as any).cartItems.list({
-        where: { userId: user.id }
-      });
-      await Promise.all(data.map((item: any) => (blink.db as any).cartItems.delete(item.id)));
       setItems([]);
-    } catch (error) {
-      console.error('Failed to clear cart:', error);
-    }
   };
 
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);

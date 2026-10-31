@@ -115,6 +115,12 @@ export function OrderDetail() {
     const steps = ['pending', 'processing', 'shipped', 'delivered'];
     return steps.indexOf(order.status);
   };
+  const subtotal = orderItems.reduce(
+    (sum, item) => sum + Number(item.price) * Number(item.quantity),
+    0,
+  );
+  const shipping = subtotal > 5000 ? 0 : 250;
+  const tax = subtotal * 0.15;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -194,7 +200,7 @@ export function OrderDetail() {
                 </p>
                 <p className="text-[10px] text-muted-foreground">Qty: {item.quantity}</p>
               </div>
-              <p className="text-sm font-bold">${(Number(item.price) * item.quantity).toFixed(2)}</p>
+              <p className="text-sm font-bold">{(Number(item.price) * item.quantity).toLocaleString()} ETB</p>
             </div>
           ))}
         </div>
@@ -217,20 +223,20 @@ export function OrderDetail() {
           <div className="p-4 border rounded-sm space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>${(Number(order.totalAmount) / 1.08 - (Number(order.totalAmount) > 150 ? 0 : 15)).toFixed(2)}</span>
+              <span>{subtotal.toLocaleString()} ETB</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Shipping</span>
-              <span>{Number(order.totalAmount) > 162 ? 'Free' : '$15.00'}</span>
+              <span>{shipping === 0 ? 'Free' : `${shipping.toLocaleString()} ETB`}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tax</span>
-              <span>${(Number(order.totalAmount) * 0.074).toFixed(2)}</span>
+              <span>{tax.toLocaleString()} ETB</span>
             </div>
             <Separator />
             <div className="flex justify-between font-bold">
               <span>Total</span>
-              <span>${Number(order.totalAmount).toFixed(2)}</span>
+              <span>{Number(order.totalAmount).toLocaleString()} ETB</span>
             </div>
           </div>
         </div>

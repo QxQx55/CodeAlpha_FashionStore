@@ -86,7 +86,7 @@ export function CartDrawer() {
                           </button>
                         </div>
                         <span className="text-sm font-semibold">
-                          ${((item.variant.price || item.product.basePrice) * item.quantity).toFixed(2)}
+                          {((item.variant.price || item.product.basePrice) * item.quantity).toLocaleString()} ETB
                         </span>
                       </div>
                     </div>
@@ -99,7 +99,7 @@ export function CartDrawer() {
               <div className="w-full space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-semibold">${subtotal.toFixed(2)}</span>
+                  <span className="font-semibold">{subtotal.toLocaleString()} ETB</span>
                 </div>
                 <p className="text-[10px] text-muted-foreground italic text-center">
                   Shipping and taxes calculated at checkout.

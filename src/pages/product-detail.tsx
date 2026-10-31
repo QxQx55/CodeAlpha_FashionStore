@@ -354,7 +354,7 @@ export function ProductDetail() {
             <AccordionItem value="shipping">
               <AccordionTrigger className="text-xs font-bold uppercase tracking-widest">Shipping & Returns</AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground leading-relaxed">
-                Free standard shipping on orders over $150. Returns accepted within 30 days of purchase in original condition.
+                Free standard shipping on orders over 5,000 ETB. Returns accepted within 30 days of purchase in original condition.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

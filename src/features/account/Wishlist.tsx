@@ -84,7 +84,7 @@ export function Wishlist() {
                 </div>
                 <div className="mt-3 space-y-1 text-center">
                   <h3 className="text-sm font-medium">{item.product.name}</h3>
-                  <p className="text-sm font-bold">${Number(item.product.basePrice).toFixed(2)}</p>
+                  <p className="text-sm font-bold">{Number(item.product.basePrice).toLocaleString()} ETB</p>
                 </div>
               </Link>
               <button 

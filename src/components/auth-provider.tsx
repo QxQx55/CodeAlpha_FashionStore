@@ -1,13 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { blink } from '@/lib/blink';
-import type { BlinkUser } from '@blinkdotnew/sdk';
+import { blink, type StoreUser } from '@/lib/blink';
 
 interface AuthContextType {
-  user: BlinkUser | null;
+  user: StoreUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (redirectUrl?: string) => void;
-  signUp: (data: any) => Promise<void>;
+  signUp: (data: { email: string; password: string; displayName: string }) => Promise<void>;
   signIn: (email: string, pass: string) => Promise<void>;
   logout: () => void;
 }
@@ -15,19 +14,28 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<BlinkUser | null>(null);
+  const [user, setUser] = useState<StoreUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
-      setUser(state.user);
-      if (!state.isLoading) setIsLoading(false);
+    const unsubscribe = blink.auth.onAuthStateChanged(({ user: nextUser, isLoading: loading }) => {
+      setUser(nextUser);
+      setIsLoading(loading);
     });
+    blink.auth.getCurrentUser()
+      .then((currentUser) => {
+        setUser(currentUser);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error('Failed to restore sign-in session:', error);
+        setIsLoading(false);
+      });
     return unsubscribe;
   }, []);
 
   const login = (redirectUrl?: string) => blink.auth.login(redirectUrl);
-  const signUp = async (data: any) => {
+  const signUp = async (data: { email: string; password: string; displayName: string }) => {
     await blink.auth.signUp(data);
   };
   const signIn = async (email: string, pass: string) => {

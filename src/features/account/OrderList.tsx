@@ -81,7 +81,7 @@ export function OrderList() {
                 </div>
               </div>
               <div className="text-right space-y-1">
-                <p className="text-xs font-bold">${Number(order.totalAmount).toFixed(2)}</p>
+                <p className="text-xs font-bold">{Number(order.totalAmount).toLocaleString()} ETB</p>
                 <Badge variant="secondary" className="text-[10px] uppercase">{order.status}</Badge>
               </div>
             </Link>

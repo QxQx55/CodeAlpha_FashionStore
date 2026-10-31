@@ -60,6 +60,10 @@ export function CollectionDetail() {
   }, [products]);
 
   useEffect(() => {
+    setPriceRange(availableFilters.priceRange);
+  }, [availableFilters.priceRange]);
+
+  useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -278,8 +282,8 @@ export function CollectionDetail() {
                       className="w-full"
                     />
                     <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                      <span>${priceRange[0]}</span>
-                      <span>${priceRange[1]}</span>
+                      <span>{priceRange[0].toLocaleString()} ETB</span>
+                      <span>{priceRange[1].toLocaleString()} ETB</span>
                     </div>
                   </div>
                 </div>
@@ -424,7 +428,7 @@ export function CollectionDetail() {
                 onClick={() => setPriceRange([availableFilters.priceRange[0], availableFilters.priceRange[1]])}
                 className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-secondary rounded-sm hover:bg-secondary/80"
               >
-                ${priceRange[0]} - ${priceRange[1]} <X className="h-3 w-3" />
+                {priceRange[0].toLocaleString()} - {priceRange[1].toLocaleString()} ETB <X className="h-3 w-3" />
               </button>
             )}
             <button
