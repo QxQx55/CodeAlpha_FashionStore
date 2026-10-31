@@ -7,6 +7,7 @@ import { after, before, test } from 'node:test';
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wende-store-test-'));
 process.env.DB_PATH = path.join(temporaryDirectory, 'store.sqlite');
 process.env.JWT_SECRET = 'test-secret';
+process.env.ADMIN_EMAIL = 'admin@example.com';
 const { createApp } = await import('./index.js');
 let server;
 let baseUrl;
@@ -73,14 +74,14 @@ test('registers customers and places orders using current database prices and st
   const excessiveCartItem = await request('/api/cartItems', {
     method: 'POST',
     token: login.body.token,
-    body: JSON.stringify({ variantId: 'variant_hab_1_default', quantity: 26 }),
+    body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 26 }),
   });
   assert.equal(excessiveCartItem.response.status, 409);
 
   const cartItem = await request('/api/cartItems', {
     method: 'POST',
     token,
-    body: JSON.stringify({ variantId: 'variant_hab_1_default', quantity: 2, price: 1 }),
+    body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 2, price: 1 }),
   });
   assert.equal(cartItem.response.status, 201);
   assert.equal(cartItem.body.quantity, 2);
@@ -115,8 +116,8 @@ test('registers customers and places orders using current database prices and st
 
   const remainingCart = await request('/api/cartItems', { token });
   assert.deepEqual(remainingCart.body, []);
-  const [variant] = (await request('/api/productVariants?where=%7B%22id%22%3A%22variant_hab_1_default%22%7D')).body;
-  assert.equal(variant.stock, 23);
+  const [variant] = (await request('/api/productVariants?where=%7B%22id%22%3A%22variant_hab_1_s%22%7D')).body;
+  assert.equal(variant.stock, 3);
 
   const secondRegistration = await request('/api/auth/register', {
     method: 'POST',
@@ -130,4 +131,71 @@ test('registers customers and places orders using current database prices and st
     token: secondRegistration.body.token,
   });
   assert.equal(otherOrderItems.response.status, 404);
+
+  const anonymousProduct = await request('/api/products', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'Unauthorized product', basePrice: 1, collectionId: 'coll_men' }),
+  });
+  assert.equal(anonymousProduct.response.status, 401);
+
+  const customerProduct = await request('/api/products', {
+    method: 'POST',
+    token: secondRegistration.body.token,
+    body: JSON.stringify({ name: 'Unauthorized product', basePrice: 1, collectionId: 'coll_men' }),
+  });
+  assert.equal(customerProduct.response.status, 403);
+
+  const adminRegistration = await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email: 'admin@example.com', password: 'secure-password-admin', displayName: 'Store Admin' }),
+  });
+  assert.equal(adminRegistration.body.user.isAdmin, true);
+
+  const product = await request('/api/products', {
+    method: 'POST',
+    token: adminRegistration.body.token,
+    body: JSON.stringify({
+      name: 'New Store Product',
+      slug: 'new-store-product',
+      description: 'Added from the admin product form.',
+      collectionId: 'coll_women',
+      gender: 'women',
+      basePrice: 2300,
+      imageUrl: 'https://example.com/product.jpg',
+      active: '1',
+      initialStock: 7,
+      sizes: ['S', 'M', 'L'],
+    }),
+  });
+  assert.equal(product.response.status, 201);
+  assert.equal(product.body.basePrice, 2300);
+  assert.equal(product.body.collectionId, 'coll_women');
+  assert.equal(product.body.gender, 'women');
+
+  const publishedProduct = await request(`/api/products?where=${encodeURIComponent(JSON.stringify({ slug: 'new-store-product', active: '1' }))}`);
+  assert.equal(publishedProduct.body.length, 1);
+  const newVariants = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ productId: product.body.id }))}`)).body;
+  assert.deepEqual(newVariants.map((variant) => variant.size).sort(), ['L', 'M', 'S']);
+  assert.ok(newVariants.every((variant) => variant.price === 2300 && variant.stock === 7));
+
+  const updatedProduct = await request(`/api/products/${product.body.id}`, {
+    method: 'PUT',
+    token: adminRegistration.body.token,
+    body: JSON.stringify({ basePrice: 2500 }),
+  });
+  assert.equal(updatedProduct.response.status, 200);
+  assert.equal(updatedProduct.body.basePrice, 2500);
+  const updatedVariants = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ productId: product.body.id }))}`)).body;
+  assert.ok(updatedVariants.every((variant) => variant.price === 2500 && variant.stock === 7));
+
+  const invalidProduct = await request('/api/products', {
+    method: 'POST',
+    token: adminRegistration.body.token,
+    body: JSON.stringify({
+      name: 'Product without category',
+      slug: 'product-without-category',
+      basePrice: 1500,
+    }),
+  });
+  assert.equal(invalidProduct.response.status, 400);
 });

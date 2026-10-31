@@ -12,7 +12,7 @@ db.pragma('journal_mode = WAL');
 
 export const resources = {
   collections: ['id', 'name', 'slug', 'description', 'imageUrl', 'active'],
-  products: ['id', 'name', 'slug', 'description', 'basePrice', 'imageUrl', 'collectionId', 'active', 'sizeGuide', 'fitNotes', 'createdAt'],
+  products: ['id', 'name', 'slug', 'description', 'basePrice', 'imageUrl', 'collectionId', 'gender', 'active', 'sizeGuide', 'fitNotes', 'createdAt'],
   productVariants: ['id', 'productId', 'size', 'color', 'material', 'price', 'stock', 'imageUrls'],
   cartItems: ['id', 'userId', 'variantId', 'quantity'],
   wishlist: ['id', 'userId', 'productId'],
@@ -40,6 +40,7 @@ export function initializeDatabase() {
       id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
       description TEXT NOT NULL DEFAULT '', basePrice REAL NOT NULL,
       imageUrl TEXT NOT NULL DEFAULT '', collectionId TEXT,
+      gender TEXT NOT NULL DEFAULT 'unisex',
       active TEXT NOT NULL DEFAULT '1', sizeGuide TEXT, fitNotes TEXT,
       createdAt TEXT NOT NULL,
       FOREIGN KEY (collectionId) REFERENCES collections(id) ON DELETE SET NULL
@@ -86,13 +87,36 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS order_items_order_idx ON orderItems(orderId);
   `);
 
+  const productColumns = db.prepare('PRAGMA table_info(products)').all();
+  if (!productColumns.some((column) => column.name === 'gender')) {
+    db.exec("ALTER TABLE products ADD COLUMN gender TEXT NOT NULL DEFAULT 'unisex'");
+    db.exec(`
+      UPDATE products
+      SET gender = CASE
+        WHEN collections.slug = 'men' THEN 'men'
+        WHEN collections.slug = 'women' THEN 'women'
+        WHEN collections.slug = 'kids' THEN 'kids'
+        WHEN collections.slug = 'traditional' AND lower(products.name) LIKE '%women%' THEN 'women'
+        WHEN collections.slug = 'traditional' AND lower(products.name) LIKE '%men%' THEN 'men'
+        ELSE 'unisex'
+      END
+      FROM collections
+      WHERE products.collectionId = collections.id
+    `);
+  }
+
+  const adminEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+  if (adminEmail) {
+    db.prepare('UPDATE users SET isAdmin = 1 WHERE email = ?').run(adminEmail);
+  }
+
   const insertCollection = db.prepare(`
     INSERT OR IGNORE INTO collections (id, name, slug, description, imageUrl, active)
     VALUES (@id, @name, @slug, @description, @imageUrl, @active)
   `);
   const insertProduct = db.prepare(`
-    INSERT OR IGNORE INTO products (id, name, slug, description, basePrice, imageUrl, collectionId, active, createdAt)
-    VALUES (@id, @name, @slug, @description, @basePrice, @imageUrl, @collectionId, @active, @createdAt)
+    INSERT OR IGNORE INTO products (id, name, slug, description, basePrice, imageUrl, collectionId, gender, active, createdAt)
+    VALUES (@id, @name, @slug, @description, @basePrice, @imageUrl, @collectionId, @gender, @active, @createdAt)
   `);
   const insertVariant = db.prepare(`
     INSERT OR IGNORE INTO productVariants (id, productId, size, color, material, price, stock, imageUrls)

@@ -349,6 +349,70 @@ function createApp() {
   function createResource(req, res, resource) {
     const fields = cleanFields(resource, req.body);
     if (!fields.id) fields.id = crypto.randomUUID();
+    if (resource === 'products') {
+      fields.name = String(fields.name || '').trim();
+      fields.slug = String(fields.slug || fields.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')).trim();
+      fields.description = String(fields.description || '');
+      fields.collectionId = String(fields.collectionId || '');
+      fields.gender = String(fields.gender || 'unisex').toLowerCase();
+      fields.basePrice = Number(fields.basePrice);
+      fields.imageUrl = String(fields.imageUrl || '').trim();
+      fields.sizeGuide = String(fields.sizeGuide || '');
+      fields.fitNotes = String(fields.fitNotes || '');
+      fields.active = fields.active === '0' || fields.active === 0 || fields.active === false ? '0' : '1';
+
+      if (!fields.name || fields.name.length > 200) {
+        throw new HttpError(400, 'Enter a product name up to 200 characters.');
+      }
+      if (!fields.slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fields.slug) || fields.slug.length > 200) {
+        throw new HttpError(400, 'Enter a valid product URL slug.');
+      }
+      if (!Number.isFinite(fields.basePrice) || fields.basePrice <= 0) {
+        throw new HttpError(400, 'Product price must be greater than zero.');
+      }
+      if (!['men', 'women', 'unisex', 'kids'].includes(fields.gender)) {
+        throw new HttpError(400, 'Choose a valid product audience.');
+      }
+      if (!db.prepare('SELECT id FROM collections WHERE id = ? AND active = ?').get(fields.collectionId, '1')) {
+        throw new HttpError(400, 'Choose an active product category.');
+      }
+      const initialStock = Number(req.body?.initialStock ?? 25);
+      if (!Number.isInteger(initialStock) || initialStock < 0 || initialStock > 1000000) {
+        throw new HttpError(400, 'Initial stock must be a whole number between 0 and 1,000,000.');
+      }
+      const sizes = Array.isArray(req.body?.sizes)
+        ? [...new Set(req.body.sizes.map((size) => String(size).trim()).filter(Boolean))]
+        : ['One Size'];
+      if (sizes.length === 0 || sizes.length > 30 || sizes.some((size) => size.length > 30)) {
+        throw new HttpError(400, 'Add between 1 and 30 valid product sizes.');
+      }
+      fields.createdAt = new Date().toISOString();
+      const insertProduct = db.prepare(`
+        INSERT INTO products (id, name, slug, description, basePrice, imageUrl, collectionId, gender, active, sizeGuide, fitNotes, createdAt)
+        VALUES (@id, @name, @slug, @description, @basePrice, @imageUrl, @collectionId, @gender, @active, @sizeGuide, @fitNotes, @createdAt)
+      `);
+      const insertVariant = db.prepare(`
+        INSERT INTO productVariants (id, productId, size, color, material, price, stock, imageUrls)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      db.transaction(() => {
+        insertProduct.run(fields);
+        sizes.forEach((size) => {
+          insertVariant.run(
+            crypto.randomUUID(),
+            fields.id,
+            size,
+            'Default',
+            '',
+            fields.basePrice,
+            initialStock,
+            JSON.stringify(fields.imageUrl ? [fields.imageUrl] : []),
+          );
+        });
+      })();
+      return res.status(201).json(db.prepare('SELECT * FROM products WHERE id = ?').get(fields.id));
+    }
+
     const entries = Object.entries(fields);
     if (entries.length === 0) throw new HttpError(400, 'No valid fields were provided.');
     const names = entries.map(([key]) => `"${key}"`).join(', ');
@@ -374,10 +438,45 @@ function createApp() {
         if (['products', 'productVariants', 'collections', 'orders', 'returns'].includes(resource)) {
           const fields = cleanFields(resource, req.body);
           delete fields.id;
+          if (resource === 'products') {
+            if (fields.name !== undefined) fields.name = String(fields.name).trim();
+            if (fields.slug !== undefined) fields.slug = String(fields.slug).trim();
+            if (fields.basePrice !== undefined) fields.basePrice = Number(fields.basePrice);
+            if (fields.collectionId !== undefined) fields.collectionId = String(fields.collectionId || '');
+            if (fields.gender !== undefined) fields.gender = String(fields.gender).toLowerCase();
+            if (fields.name !== undefined && (!fields.name || fields.name.length > 200)) {
+              throw new HttpError(400, 'Enter a product name up to 200 characters.');
+            }
+            if (fields.slug !== undefined && (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fields.slug) || fields.slug.length > 200)) {
+              throw new HttpError(400, 'Enter a valid product URL slug.');
+            }
+            if (fields.basePrice !== undefined && (!Number.isFinite(fields.basePrice) || fields.basePrice <= 0)) {
+              throw new HttpError(400, 'Product price must be greater than zero.');
+            }
+            if (fields.gender !== undefined && !['men', 'women', 'unisex', 'kids'].includes(fields.gender)) {
+              throw new HttpError(400, 'Choose a valid product audience.');
+            }
+            if (fields.collectionId !== undefined && !db.prepare('SELECT id FROM collections WHERE id = ? AND active = ?').get(fields.collectionId, '1')) {
+              throw new HttpError(400, 'Choose an active product category.');
+            }
+            if (fields.active !== undefined) {
+              fields.active = fields.active === '0' || fields.active === 0 || fields.active === false ? '0' : '1';
+            }
+          }
           const entries = Object.entries(fields);
           if (entries.length === 0) throw new HttpError(400, 'No valid fields were provided.');
-          db.prepare(`UPDATE "${resource}" SET ${entries.map(([key]) => `"${key}" = ?`).join(', ')} WHERE id = ?`)
-            .run(...entries.map(([, value]) => value), id);
+          const updateRecord = db.transaction(() => {
+            db.prepare(`UPDATE "${resource}" SET ${entries.map(([key]) => `"${key}" = ?`).join(', ')} WHERE id = ?`)
+              .run(...entries.map(([, value]) => value), id);
+            if (resource === 'products' && fields.basePrice !== undefined) {
+              db.prepare(`
+                UPDATE productVariants
+                SET price = ?
+                WHERE productId = ? AND (price IS NULL OR price = ?)
+              `).run(fields.basePrice, id, current.basePrice);
+            }
+          });
+          updateRecord();
           return res.json(db.prepare(`SELECT * FROM "${resource}" WHERE id = ?`).get(id));
         }
         throw new HttpError(403, 'This record cannot be updated.');
