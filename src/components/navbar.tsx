@@ -143,15 +143,15 @@ export function Navbar() {
       </div>
 
       <nav aria-label="Shop categories" className="border-y border-[#ededed] bg-[#fcfcfc]">
-        <div className="container mx-auto flex flex-col items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3d3d3d]">
-          <Link to="/" className="w-full py-1 text-center text-[#df713a] hover:bg-[#fff5ef]">Home</Link>
-          <Link to="/collections/all" className="w-full py-1 text-center text-[#c9602e] hover:bg-[#fff5ef]">Product Categories</Link>
+        <div className="container mx-auto flex items-center justify-start gap-4 overflow-x-auto px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.05em] text-[#3d3d3d] sm:justify-center sm:gap-6 sm:px-4 sm:text-[10px] sm:tracking-[0.08em] lg:gap-8">
+          <Link to="/" className="shrink-0 rounded-sm px-1 py-1 text-[#df713a] hover:bg-[#fff5ef] sm:px-2">Home</Link>
+          <Link to="/collections/all" className="shrink-0 rounded-sm px-1 py-1 text-[#c9602e] hover:bg-[#fff5ef] sm:px-2">Product Categories</Link>
           {collections.map((collection) => (
-            <Link key={collection.id} to={`/collections/${collection.slug}`} className="w-full py-1 text-center hover:bg-[#fff5ef] hover:text-[#df713a]">
+            <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 px-1 py-1 hover:bg-[#fff5ef] hover:text-[#df713a] sm:px-2">
               {collection.name}
             </Link>
           ))}
-          <Link to="/collections/all?sort=newest" className="w-full py-1 text-center hover:bg-[#fff5ef] hover:text-[#df713a]">New arrivals</Link>
+          <Link to="/collections/all?sort=newest" className="shrink-0 px-1 py-1 hover:bg-[#fff5ef] hover:text-[#df713a] sm:px-2">New arrivals</Link>
         </div>
       </nav>
 
