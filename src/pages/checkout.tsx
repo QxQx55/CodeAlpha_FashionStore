@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Banknote, Check, ShieldCheck, Truck } from 'lucide-react';
+import { ArrowLeft, Banknote, Check, CreditCard, ShieldCheck, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth-provider';
 import { useCart } from '@/components/cart-provider';
@@ -38,6 +38,8 @@ export function Checkout() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<ShippingAddress>(initialAddress);
+  const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'chapa'>('cash_on_delivery');
+  const [chapaAvailable, setChapaAvailable] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -49,6 +51,12 @@ export function Checkout() {
   useEffect(() => {
     setFormData((previous) => ({ ...previous, email: user?.email || previous.email }));
   }, [user]);
+
+  useEffect(() => {
+    storeApi.api.getChapaStatus()
+      .then(({ available }) => setChapaAvailable(available))
+      .catch((error) => console.error('Failed to check Chapa availability:', error));
+  }, []);
 
   const shippingCost = subtotal > 5000 ? 0 : 250;
   const tax = subtotal * 0.15;
@@ -77,7 +85,11 @@ export function Checkout() {
 
     setLoading(true);
     try {
-      const order = await storeApi.api.createOrder(formData);
+      const order = await storeApi.api.createOrder(formData, paymentMethod);
+      if ('paymentUrl' in order) {
+        window.location.assign(order.paymentUrl);
+        return;
+      }
       await clearCart();
       toast.success('Order placed successfully!');
       navigate(`/account/orders/${order.id}`);
@@ -193,16 +205,48 @@ export function Checkout() {
                 </span>
                 <h2 className="text-sm font-bold uppercase tracking-widest">Payment</h2>
               </div>
-              <div className="flex items-start gap-4 rounded-sm border border-accent bg-accent/5 p-5">
-                <Banknote className="mt-0.5 h-5 w-5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Cash on delivery</p>
-                  <p className="text-xs text-muted-foreground">Pay when your order arrives. Online payment is not enabled for this store yet.</p>
-                </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className={`flex cursor-pointer items-start gap-3 rounded-sm border p-4 transition-colors ${paymentMethod === 'cash_on_delivery' ? 'border-accent bg-accent/5' : 'border-border'}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="cash_on_delivery"
+                    checked={paymentMethod === 'cash_on_delivery'}
+                    onChange={() => setPaymentMethod('cash_on_delivery')}
+                    className="mt-1 accent-[#b38b38]"
+                  />
+                  <Banknote className="mt-0.5 h-5 w-5 shrink-0" />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium">Cash on delivery</span>
+                    <span className="block text-xs text-muted-foreground">Pay when your order arrives.</span>
+                  </span>
+                </label>
+                <label className={`flex items-start gap-3 rounded-sm border p-4 transition-colors ${chapaAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${paymentMethod === 'chapa' ? 'border-accent bg-accent/5' : 'border-border'}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="chapa"
+                    checked={paymentMethod === 'chapa'}
+                    onChange={() => setPaymentMethod('chapa')}
+                    disabled={!chapaAvailable}
+                    className="mt-1 accent-[#b38b38]"
+                  />
+                  <CreditCard className="mt-0.5 h-5 w-5 shrink-0" />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium">Pay securely with Chapa</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {chapaAvailable
+                        ? 'Continue to Chapa’s hosted payment page.'
+                        : 'Add CHAPA_SECRET_KEY to the API server to enable online payments.'}
+                    </span>
+                  </span>
+                </label>
               </div>
               <p className="flex items-center gap-2 text-xs text-muted-foreground">
                 <ShieldCheck className="h-4 w-4 text-green-600" />
-                Your card details are never requested or stored by this demo store.
+                {paymentMethod === 'chapa'
+                  ? 'Payment details are entered on Chapa and are never stored by this store.'
+                  : 'Your card details are never requested or stored by this store.'}
               </p>
             </section>
 
@@ -211,7 +255,7 @@ export function Checkout() {
               className="h-14 w-full text-sm font-bold uppercase tracking-widest"
               disabled={loading || !isContactValid || !isShippingValid}
             >
-              {loading ? 'Placing order...' : `Place order · ${total.toLocaleString()} ETB`}
+              {loading ? 'Processing...' : `${paymentMethod === 'chapa' ? 'Continue to Chapa' : 'Place order'} · ${total.toLocaleString()} ETB`}
             </Button>
           </form>
         </div>

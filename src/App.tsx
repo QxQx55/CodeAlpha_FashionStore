@@ -8,6 +8,7 @@ import { CollectionDetail } from './pages/collection-detail';
 import { ProductDetail } from './pages/product-detail';
 import { Account } from './pages/account';
 import { Checkout } from './pages/checkout';
+import { CheckoutComplete } from './pages/checkout-complete';
 import { AdminDashboard } from './pages/admin/dashboard';
 import { Login } from './pages/login';
 import { Register } from './pages/register';
@@ -26,6 +27,7 @@ function App() {
               <Route path="/products/:slug" element={<ProductDetail />} />
               <Route path="/account/*" element={<Account />} />
               <Route path="/checkout" element={<Checkout />} />
+              <Route path="/checkout/complete" element={<CheckoutComplete />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
             </Routes>
           </Layout>

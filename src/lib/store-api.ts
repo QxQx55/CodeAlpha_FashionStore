@@ -5,6 +5,21 @@ export interface StoreUser {
   isAdmin: boolean;
 }
 
+export interface StoreOrder {
+  id: string;
+  userId: string;
+  totalAmount: number;
+  status: string;
+  shippingAddress: string;
+  createdAt: string;
+}
+
+export type CheckoutResult = StoreOrder | {
+  orderId: string;
+  txRef: string;
+  paymentUrl: string;
+};
+
 const TOKEN_KEY = 'wende_store_token';
 type AuthListener = (state: { user: StoreUser | null; isLoading: boolean }) => void;
 const authListeners = new Set<AuthListener>();
@@ -83,10 +98,12 @@ const db = Object.fromEntries(resourceNames.map((resource) => [
 export const storeApi = {
   db,
   api: {
-    createOrder: (shippingAddress: Record<string, string>) => apiRequest<any>('/api/checkout', {
+    createOrder: (shippingAddress: Record<string, string>, paymentMethod: 'cash_on_delivery' | 'chapa' = 'cash_on_delivery') => apiRequest<CheckoutResult>('/api/checkout', {
       method: 'POST',
-      body: JSON.stringify({ shippingAddress, paymentMethod: 'cash_on_delivery' }),
+      body: JSON.stringify({ shippingAddress, paymentMethod }),
     }),
+    getChapaStatus: () => apiRequest<{ available: boolean }>('/api/payments/chapa/status'),
+    verifyChapaPayment: (txRef: string) => apiRequest<StoreOrder>(`/api/payments/chapa/verify/${encodeURIComponent(txRef)}`),
   },
   auth: {
     onAuthStateChanged(listener: AuthListener) {
