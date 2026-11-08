@@ -77,17 +77,17 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <article
-      className="group flex h-full flex-col overflow-hidden rounded-md border border-gray-100 bg-white transition-shadow hover:shadow-md"
+      className="group flex h-full flex-col bg-white"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="relative">
         <Link to={`/products/${product.slug}`} aria-label={`View ${product.name}`}>
-          <div className="aspect-[4/5] overflow-hidden bg-[#f7f7f7]">
+          <div className="aspect-[4/5] overflow-hidden bg-[#f5f3f1]">
             <img
               src={isHovered && secondaryImage ? secondaryImage : mainImage}
               alt={product.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
               loading="lazy"
               onError={(event) => {
                 event.currentTarget.src = fallbackImage;
@@ -102,7 +102,7 @@ export function ProductCard({ product }: ProductCardProps) {
           aria-label={isInWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
           aria-pressed={isInWishlist}
           className={cn(
-            'absolute right-2 top-2 rounded-full bg-white/95 p-2 text-gray-700 shadow-sm transition-colors hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:opacity-50',
+            'absolute right-2 top-2 rounded-full bg-white/95 p-2 text-gray-700 shadow-sm transition-colors hover:text-[#df713a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:opacity-50',
             isInWishlist && 'text-red-600',
           )}
         >
@@ -110,19 +110,18 @@ export function ProductCard({ product }: ProductCardProps) {
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col items-start p-3">
-        <Link to={`/products/${product.slug}`} className="line-clamp-2 min-h-10 text-left text-sm leading-5 text-gray-800 hover:text-[#176b73]">
+      <div className="flex flex-1 flex-col items-start pt-2.5">
+        <Link to={`/products/${product.slug}`} className="line-clamp-2 min-h-9 text-left text-[11px] leading-4 text-gray-700 hover:text-[#d96831] sm:text-xs">
           {product.name}
         </Link>
-        <p className="mt-2 text-base font-bold text-gray-950">
-          {product.basePrice.toLocaleString()} <span className="text-xs font-medium">ETB</span>
+        <p className="mt-1.5 text-sm font-bold text-gray-900">
+          {product.basePrice.toLocaleString()} <span className="text-[10px] font-medium">ETB</span>
         </p>
-        <p className="mt-1 text-xs text-gray-600">Delivery options at checkout</p>
         <Link
           to={`/products/${product.slug}`}
-          className="mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-full border border-[#d5d9d9] bg-[#ffd814] px-3 text-xs font-semibold text-gray-900 transition-colors hover:bg-[#f7ca00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+          className="mt-2 inline-flex items-center gap-1 border-b border-[#e77b43] pb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-[#555] transition-colors hover:text-[#d96831] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
         >
-          View details
+          View details <span aria-hidden="true">→</span>
         </Link>
       </div>
     </article>
