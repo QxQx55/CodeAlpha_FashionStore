@@ -1,183 +1,164 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingBag, User, Heart, Search, Menu, X, Settings } from 'lucide-react';
+import { Heart, LogOut, Menu, Search, Settings, ShoppingBag, UserRound, X } from 'lucide-react';
 import { useCart } from './cart-provider';
 import { useAuth } from './auth-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 import { storeApi } from '@/lib/store-api';
 
+interface CollectionLink {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export function Navbar() {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [collections, setCollections] = useState<any[]>([]);
+  const [collections, setCollections] = useState<CollectionLink[]>([]);
   const { totalCount, setIsOpen: setIsCartOpen } = useCart();
-  const { user, isAuthenticated, login } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    storeApi.db.collections.list({ where: { active: '1' } })
+      .then(setCollections)
+      .catch((error) => console.error('Failed to fetch collections:', error));
   }, []);
 
-  useEffect(() => {
-    const fetchCollections = async () => {
-      try {
-        const data = await (storeApi.db as any).collections.list({
-          where: { active: "1" }
-        });
-        setCollections(data);
-      } catch (error) {
-        console.error('Failed to fetch collections:', error);
-      }
-    };
-    fetchCollections();
-  }, []);
-
-  // Close mobile menu and search on navigation
   useEffect(() => {
     setIsMobileMenuOpen(false);
-    setIsSearchOpen(false);
     setSearchQuery('');
   }, [location]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/collections/all?q=${encodeURIComponent(searchQuery.trim())}`);
-      setIsSearchOpen(false);
-      setSearchQuery('');
-    }
+  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = searchQuery.trim().slice(0, 120);
+    if (query) navigate(`/collections/all?q=${encodeURIComponent(query)}`);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
   return (
-    <nav
-      className={cn(
-        'fixed top-0 z-50 w-full transition-all duration-300',
-        isScrolled ? 'bg-background/80 backdrop-blur-md border-b py-2' : 'bg-transparent py-4'
-      )}
-    >
-      <div className="container mx-auto px-4 lg:px-8">
-        <div className="flex items-center justify-between">
-          {/* Mobile Menu Toggle */}
-          <button 
-            className="lg:hidden p-2"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
-
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-8">
-            <Link to="/" className="text-sm font-medium hover:text-accent transition-colors">Home</Link>
-            {collections.map((collection) => (
-              <Link
-                key={collection.id}
-                to={`/collections/${collection.slug}`}
-                className="text-sm font-medium hover:text-accent transition-colors"
-              >
-                {collection.name}
-              </Link>
-            ))}
-          </div>
-
-          {/* Logo */}
-          <Link to="/" className="absolute left-1/2 -translate-x-1/2 lg:static lg:translate-x-0">
-            <span className="font-serif text-2xl font-bold tracking-tighter uppercase">Habesha</span>
-          </Link>
-
-          {/* Actions */}
-          <div className="flex items-center space-x-4">
-            <button 
-              className="hidden sm:block p-2 hover:text-accent transition-colors"
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-            >
-              {isSearchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
-            </button>
-            <Link to="/account" className="p-2 hover:text-accent transition-colors">
-              <User className="h-5 w-5" />
-            </Link>
-            {user?.isAdmin && (
-              <Link to="/admin/products" aria-label="Manage store" title="Manage store" className="p-2 hover:text-accent transition-colors">
-                <Settings className="h-5 w-5" />
-              </Link>
-            )}
-            <Link to="/account/wishlist" className="hidden sm:block p-2 hover:text-accent transition-colors">
-              <Heart className="h-5 w-5" />
-            </Link>
-            <button 
-              className="p-2 relative hover:text-accent transition-colors"
-              onClick={() => setIsCartOpen(true)}
-            >
-              <ShoppingBag className="h-5 w-5" />
-              {totalCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center">
-                  {totalCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        {isSearchOpen && (
-          <div className="absolute top-full left-0 w-full bg-background border-b animate-fade-in p-4">
-            <form onSubmit={handleSearch} className="container mx-auto flex items-center space-x-2">
-              <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <Input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="border-none focus-visible:ring-0 text-sm bg-transparent"
-                autoFocus
-              />
-              <Button type="submit" variant="ghost" size="sm" className="text-xs uppercase tracking-widest">
-                Search
-              </Button>
-            </form>
-          </div>
-        )}
-
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden absolute top-full left-0 w-full bg-background border-b animate-fade-in p-4 space-y-4">
-            <Link to="/" className="block text-lg font-medium border-b pb-2">Home</Link>
-            {collections.map((collection) => (
-              <Link
-                key={collection.id}
-                to={`/collections/${collection.slug}`}
-                className="block text-lg font-medium border-b pb-2"
-              >
-                {collection.name}
-              </Link>
-            ))}
-            <Link to="/account/wishlist" className="block text-lg font-medium border-b pb-2">Wishlist</Link>
-            <Link to="/account" className="block text-lg font-medium border-b pb-2">Account</Link>
-            {user?.isAdmin && (
-              <Link to="/admin/products" className="block text-lg font-medium border-b pb-2">Manage Store</Link>
-            )}
-            {/* Mobile search */}
-            <form onSubmit={handleSearch} className="flex items-center space-x-2 border-b pb-2">
-              <Input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="border-none focus-visible:ring-0 text-sm bg-transparent h-8 p-0"
-              />
-              <Button type="submit" variant="ghost" size="sm" className="text-xs h-8">
-                <Search className="h-4 w-4" />
-              </Button>
-            </form>
-          </div>
-        )}
+    <header className="sticky top-0 z-50 w-full bg-white shadow-sm">
+      <div className="bg-[#ef7056] px-4 py-2 text-center text-[11px] font-semibold tracking-[0.12em] text-white sm:text-xs">
+        A NEW SEASON, A NEW STORY <span className="mx-2 opacity-70">·</span> DISCOVER WENDE
       </div>
-    </nav>
+      <div className="container mx-auto flex min-h-[76px] items-center gap-3 px-4 py-3 lg:gap-8 lg:px-8">
+        <button
+          type="button"
+          className="rounded p-2 text-gray-800 hover:bg-gray-100 lg:hidden"
+          aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={isMobileMenuOpen}
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+
+        <Link to="/" className="flex shrink-0 flex-col leading-none" aria-label="Wende home">
+          <span className="text-[25px] font-black tracking-[0.1em] text-[#202020]">WENDE<span className="text-[#ef7056]">.</span></span>
+          <span className="mt-1 text-[8px] font-semibold tracking-[0.28em] text-gray-500">FASHION WITH A STORY</span>
+        </Link>
+
+        <form onSubmit={handleSearch} role="search" className="order-last flex h-10 w-full overflow-hidden rounded-sm border border-gray-200 bg-white sm:order-none sm:ml-auto sm:w-auto sm:flex-1 lg:mx-8 lg:max-w-xl">
+          <label htmlFor="store-search" className="sr-only">Search Wende</label>
+          <Input
+            id="store-search"
+            type="search"
+            placeholder="Search styles, shoes and more"
+            value={searchQuery}
+            maxLength={120}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent px-3 text-sm shadow-none focus-visible:ring-0"
+          />
+          <Button type="submit" variant="ghost" aria-label="Search" className="h-full rounded-none px-3 text-gray-700 hover:bg-[#fdf0ed] hover:text-[#d95e45]">
+            <Search className="h-4 w-4" />
+          </Button>
+        </form>
+
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:ml-0 sm:gap-2">
+          <Link
+            to={isAuthenticated ? '/account' : '/login'}
+            aria-label={user ? `Account for ${user.displayName}` : 'Sign in'}
+            className="hidden items-center gap-2 rounded-sm px-2 py-2 text-gray-800 hover:bg-gray-50 sm:flex"
+          >
+            <UserRound className="h-5 w-5" />
+            <span className="hidden text-left leading-tight md:block">
+              <span className="block text-[10px] text-gray-500">{user ? `Hello, ${user.displayName.split(' ')[0]}` : 'Welcome'}</span>
+              <span className="block text-xs font-semibold">{user ? 'My account' : 'Sign in'}</span>
+            </span>
+          </Link>
+          <Link to="/account/wishlist" aria-label="Wishlist" className="hidden rounded-sm p-2 text-gray-800 hover:bg-gray-50 sm:block">
+            <Heart className="h-5 w-5" />
+          </Link>
+          <button
+            type="button"
+            aria-label={`Open bag, ${totalCount} items`}
+            onClick={() => setIsCartOpen(true)}
+            className="relative rounded-sm p-2 text-gray-800 hover:bg-gray-50"
+          >
+            <ShoppingBag className="h-5 w-5" />
+            {totalCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ef7056] px-1 text-[10px] font-bold text-white">
+                {totalCount}
+              </span>
+            )}
+          </button>
+          {user?.isAdmin && (
+            <Link to="/admin/products" aria-label="Manage products" title="Manage products" className="hidden rounded-sm p-2 text-gray-800 hover:bg-gray-50 md:block">
+              <Settings className="h-5 w-5" />
+            </Link>
+          )}
+          {isAuthenticated && (
+            <button type="button" onClick={handleLogout} aria-label="Log out" title="Log out" className="hidden items-center gap-1 rounded-sm px-2 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 sm:flex">
+              <LogOut className="h-4 w-4" />
+              <span className="hidden lg:inline">Log out</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <nav aria-label="Shop categories" className="hidden border-t border-gray-100 lg:block">
+        <div className="container mx-auto flex items-center justify-center gap-7 overflow-x-auto px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-gray-700">
+          <Link to="/collections/all" className="shrink-0 transition-colors hover:text-[#ef7056]">Shop all</Link>
+          {collections.map((collection) => (
+            <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 transition-colors hover:text-[#ef7056]">
+              {collection.name}
+            </Link>
+          ))}
+          <Link to="/collections/all?sort=newest" className="shrink-0 transition-colors hover:text-[#ef7056]">New arrivals</Link>
+        </div>
+      </nav>
+
+      {isMobileMenuOpen && (
+        <nav aria-label="Mobile shop menu" className="absolute left-0 top-full z-50 w-full border-t bg-white p-4 text-gray-900 shadow-lg lg:hidden">
+          <div className="mb-3 border-b pb-3">
+            <Link to={isAuthenticated ? '/account' : '/login'} className="flex items-center gap-2 font-semibold">
+              <UserRound className="h-5 w-5" />
+              {user ? `Hello, ${user.displayName}` : 'Sign in to your account'}
+            </Link>
+          </div>
+          <Link to="/collections/all" className="block border-b py-3 font-semibold">Shop all</Link>
+          {collections.map((collection) => (
+            <Link key={collection.id} to={`/collections/${collection.slug}`} className="block border-b py-3">
+              {collection.name}
+            </Link>
+          ))}
+          {user?.isAdmin && <Link to="/admin/products" className="block border-b py-3 font-semibold">Manage products</Link>}
+          {isAuthenticated ? (
+            <button type="button" onClick={handleLogout} className="flex w-full items-center gap-2 border-t py-3 text-left font-semibold text-[#d95e45]">
+              <LogOut className="h-4 w-4" /> Log out
+            </button>
+          ) : (
+            <Link to="/login" className="block border-t py-3 font-semibold">Sign in</Link>
+          )}
+        </nav>
+      )}
+    </header>
   );
 }

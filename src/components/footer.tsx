@@ -10,9 +10,9 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
           <div className="space-y-4">
-            <span className="font-serif text-2xl font-bold tracking-tighter uppercase">Habesha</span>
+            <span className="text-2xl font-extrabold tracking-[0.12em]">WENDE</span>
             <p className="text-muted-foreground text-sm max-w-xs">
-              Authentic Ethiopian fashion. Quality pieces crafted with tradition and style for your everyday life.
+              A marketplace for thoughtful style, Ethiopian craftsmanship, and everyday favorites.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="hover:text-accent transition-colors"><Instagram className="h-5 w-5" /></a>
@@ -49,7 +49,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center text-xs text-muted-foreground space-y-4 md:space-y-0">
-          <p>© 2026 Habesha Commerce. All rights reserved.</p>
+          <p>© 2026 Wende Market. All rights reserved.</p>
           <div className="flex space-x-8">
             <a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-foreground transition-colors">Terms of Service</a>

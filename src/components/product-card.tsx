@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Heart } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/auth-provider';
 import { storeApi } from '@/lib/store-api';
 import { toast } from 'sonner';
@@ -12,38 +11,39 @@ interface ProductCardProps {
     id: string;
     name: string;
     slug: string;
-    basePrice: number; // camelCase
+    basePrice: number;
     images?: string[];
     imageUrl?: string;
   };
 }
 
+const fallbackImage = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop';
+
 export function ProductCard({ product }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const { user, login } = useAuth();
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
-  const navigate = useNavigate();
+  const { user, login } = useAuth();
 
   useEffect(() => {
-    const checkWishlist = async () => {
-      if (!user || !product) return;
-      try {
-        const wishlist = await (storeApi.db as any).wishlist.list({
-          where: { userId: user.id, productId: product.id }
-        });
-        setIsInWishlist(wishlist.length > 0);
-      } catch (error) {
-        // Silently fail
-      }
+    let active = true;
+    if (!user) {
+      setIsInWishlist(false);
+      return;
+    }
+    storeApi.db.wishlist.list({
+      where: { userId: user.id, productId: product.id },
+    }).then((wishlist) => {
+      if (active) setIsInWishlist(wishlist.length > 0);
+    }).catch((error) => {
+      console.error('Failed to check wishlist:', error);
+    });
+    return () => {
+      active = false;
     };
-    checkWishlist();
-  }, [user, product]);
+  }, [user, product.id]);
 
-  const toggleWishlist = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const toggleWishlist = async () => {
     if (!user) {
       toast.error('Please sign in to save items');
       login(window.location.href);
@@ -52,118 +52,79 @@ export function ProductCard({ product }: ProductCardProps) {
 
     setWishlistLoading(true);
     try {
-      if (isInWishlist) {
-        const wishlist = await (storeApi.db as any).wishlist.list({
-          where: { userId: user.id, productId: product.id }
-        });
-        if (wishlist.length > 0) {
-          await (storeApi.db as any).wishlist.delete(wishlist[0].id);
-        }
+      const wishlist = await storeApi.db.wishlist.list({
+        where: { userId: user.id, productId: product.id },
+      });
+      if (wishlist.length > 0) {
+        await storeApi.db.wishlist.delete(wishlist[0].id);
         setIsInWishlist(false);
         toast.success('Removed from wishlist');
       } else {
-        await (storeApi.db as any).wishlist.create({
-          userId: user.id,
-          productId: product.id
-        });
+        await storeApi.db.wishlist.create({ userId: user.id, productId: product.id });
         setIsInWishlist(true);
         toast.success('Added to wishlist');
       }
     } catch (error) {
-      toast.error('Failed to update wishlist');
+      toast.error(error instanceof Error ? error.message : 'Failed to update wishlist');
     } finally {
       setWishlistLoading(false);
     }
   };
-  const displayImages = product.images && product.images.length > 0 
-    ? product.images.filter(img => img && img.trim() !== '')
-    : ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop'];
-  
-  const finalImages = displayImages.length > 0 ? displayImages : ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop'];
-  const hasSecondaryImage = finalImages.length > 1;
+
+  const images = (product.images || []).filter((image) => image?.trim());
+  const mainImage = images[0] || product.imageUrl || fallbackImage;
+  const secondaryImage = images[1];
 
   return (
-    <div 
-      className="group space-y-4"
+    <article
+      className="group flex h-full flex-col overflow-hidden rounded-md border border-gray-100 bg-white transition-shadow hover:shadow-md"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Link to={`/products/${product.slug}`} className="block">
-        <div className="aspect-[3/4] overflow-hidden bg-secondary relative">
-          {/* Main Image */}
-          <img 
-            src={finalImages[0]} 
-            alt={product.name} 
-            className={cn(
-              "h-full w-full object-cover transition-opacity duration-700",
-              hasSecondaryImage && isHovered ? "opacity-0" : "opacity-100"
-            )}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop';
-            }}
-          />
-          
-          {/* Secondary Image (shown on hover) */}
-          {hasSecondaryImage && (
-            <img 
-              src={finalImages[1]} 
-              alt={`${product.name} detail`} 
-              className={cn(
-                "absolute inset-0 h-full w-full object-cover transition-opacity duration-700",
-                isHovered ? "opacity-100 scale-105" : "opacity-0 scale-100"
-              )}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1539109132314-34a77ae68c44?q=80&w=987&auto=format&fit=crop';
+      <div className="relative">
+        <Link to={`/products/${product.slug}`} aria-label={`View ${product.name}`}>
+          <div className="aspect-[4/5] overflow-hidden bg-[#f7f7f7]">
+            <img
+              src={isHovered && secondaryImage ? secondaryImage : mainImage}
+              alt={product.name}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.src = fallbackImage;
               }}
             />
-          )}
-
-          {/* Quick Add / View Overlay */}
-          <div className="absolute bottom-4 left-4 right-4 translate-y-[120%] group-hover:translate-y-0 transition-transform duration-500 ease-out z-10">
-            <Button 
-              className="w-full bg-white text-black hover:bg-black hover:text-white transition-colors text-[10px] font-bold uppercase tracking-widest h-12 rounded-none shadow-xl border-none"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                navigate(`/products/${product.slug}`);
-              }}
-            >
-              Quick View
-            </Button>
           </div>
-
-          {/* Badge for multiple colors/images if needed */}
-          {displayImages.length > 2 && (
-            <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-2 py-1 text-[8px] font-bold uppercase tracking-widest">
-              +{displayImages.length - 1} Views
-            </div>
-          )}
-
-          {/* Wishlist Button */}
-          <button
-            onClick={toggleWishlist}
-            disabled={wishlistLoading}
-            className={cn(
-              "absolute top-4 right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full transition-all",
-              isInWishlist ? "text-red-500" : "text-muted-foreground hover:text-red-500",
-              "opacity-0 group-hover:opacity-100"
-            )}
-          >
-            <Heart className={cn("h-4 w-4", isInWishlist && "fill-current")} />
-          </button>
-        </div>
-      </Link>
-
-      <div className="space-y-1 text-center">
-        <Link to={`/products/${product.slug}`}>
-          <h3 className="text-sm font-medium hover:text-accent transition-colors duration-300 tracking-tight">
-            {product.name}
-          </h3>
         </Link>
-        <p className="text-sm font-bold tracking-tighter">
-          {product.basePrice.toLocaleString()} ETB
-        </p>
+        <button
+          type="button"
+          onClick={toggleWishlist}
+          disabled={wishlistLoading}
+          aria-label={isInWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+          aria-pressed={isInWishlist}
+          className={cn(
+            'absolute right-2 top-2 rounded-full bg-white/95 p-2 text-gray-700 shadow-sm transition-colors hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:opacity-50',
+            isInWishlist && 'text-red-600',
+          )}
+        >
+          <Heart className={cn('h-4 w-4', isInWishlist && 'fill-current')} />
+        </button>
       </div>
-    </div>
+
+      <div className="flex flex-1 flex-col items-start p-3">
+        <Link to={`/products/${product.slug}`} className="line-clamp-2 min-h-10 text-left text-sm leading-5 text-gray-800 hover:text-[#176b73]">
+          {product.name}
+        </Link>
+        <p className="mt-2 text-base font-bold text-gray-950">
+          {product.basePrice.toLocaleString()} <span className="text-xs font-medium">ETB</span>
+        </p>
+        <p className="mt-1 text-xs text-gray-600">Delivery options at checkout</p>
+        <Link
+          to={`/products/${product.slug}`}
+          className="mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-full border border-[#d5d9d9] bg-[#ffd814] px-3 text-xs font-semibold text-gray-900 transition-colors hover:bg-[#f7ca00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+        >
+          View details
+        </Link>
+      </div>
+    </article>
   );
 }
