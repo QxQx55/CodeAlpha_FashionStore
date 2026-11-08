@@ -142,10 +142,9 @@ export function Navbar() {
         </div>
       </div>
 
-      <nav aria-label="Shop categories" className="block border-y border-[#ededed]">
-        <div className="container mx-auto flex h-10 items-center justify-start gap-2 overflow-x-auto px-3 text-[9px] font-semibold uppercase tracking-[0.06em] text-[#3d3d3d] sm:justify-between sm:gap-4 sm:px-5 sm:text-[10px] sm:tracking-[0.08em] lg:px-8">
+      <nav aria-label="Shop categories" className="hidden border-y border-[#ededed] lg:block">
+        <div className="container mx-auto flex h-10 items-center justify-between gap-5 overflow-x-auto px-8 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3d3d3d]">
           <Link to="/" className="shrink-0 rounded-sm px-2 py-2 text-[#df713a] hover:bg-[#fff5ef]">Home</Link>
-          <Link to="/collections/all" className="shrink-0 rounded-sm bg-[#fff5ef] px-2 py-2 text-[#c9602e] hover:bg-[#ffebe0]">Product Categories</Link>
           {collections.map((collection) => (
             <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 px-1 py-2 hover:text-[#df713a]">
               {collection.name}
@@ -161,12 +160,16 @@ export function Navbar() {
             <UserRound className="h-5 w-5" /> {user ? `Hello, ${user.displayName}` : 'Sign in to your account'}
           </Link>
           <Link to="/" className="block border-b py-3 font-semibold">Home</Link>
-          <Link to="/collections/all" className="block border-b py-3 font-semibold">Shop all</Link>
-          {collections.map((collection) => (
-            <Link key={collection.id} to={`/collections/${collection.slug}`} className="block border-b py-3">
-              {collection.name}
-            </Link>
-          ))}
+          <div className="border-b pb-2 pt-4">
+            <p className="mb-1 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#d96831]">Product Categories</p>
+            <Link to="/collections/all" className="block border-b py-3 font-semibold">Shop all</Link>
+            {collections.map((collection) => (
+              <Link key={collection.id} to={`/collections/${collection.slug}`} className="block border-b py-3 last:border-0">
+                {collection.name}
+              </Link>
+            ))}
+            <Link to="/collections/all?sort=newest" className="block py-3 font-medium">New arrivals</Link>
+          </div>
           <Link to="/account/wishlist" className="block border-b py-3">Wishlist</Link>
           {user?.isAdmin && <Link to="/admin/products" className="block border-b py-3 font-semibold">Manage products</Link>}
           {isAuthenticated && (
