@@ -144,7 +144,7 @@ export function Navbar() {
 
       <nav aria-label="Shop categories" className="hidden border-y border-[#ededed] lg:block">
         <div className="container mx-auto flex h-10 items-center justify-between gap-5 overflow-x-auto px-8 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3d3d3d]">
-          <Link to="/collections/all" className="shrink-0 hover:text-[#df713a]">Home</Link>
+          <Link to="/" className="shrink-0 hover:text-[#df713a]">Home</Link>
           {collections.map((collection) => (
             <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 hover:text-[#df713a]">
               {collection.name}
@@ -160,6 +160,7 @@ export function Navbar() {
           <Link to={accountPath} className="mb-3 flex items-center gap-2 border-b pb-3 font-semibold">
             <UserRound className="h-5 w-5" /> {user ? `Hello, ${user.displayName}` : 'Sign in to your account'}
           </Link>
+          <Link to="/" className="block border-b py-3 font-semibold">Home</Link>
           <Link to="/collections/all" className="block border-b py-3 font-semibold">Shop all</Link>
           {collections.map((collection) => (
             <Link key={collection.id} to={`/collections/${collection.slug}`} className="block border-b py-3">
