@@ -16,6 +16,7 @@ interface CollectionLink {
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCollection, setSelectedCollection] = useState('');
   const [collections, setCollections] = useState<CollectionLink[]>([]);
   const { totalCount, setIsOpen: setIsCartOpen } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
@@ -31,12 +32,14 @@ export function Navbar() {
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setSearchQuery('');
+    setSelectedCollection('');
   }, [location]);
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const query = searchQuery.trim().slice(0, 120);
-    if (query) navigate(`/collections/all?q=${encodeURIComponent(query)}`);
+    const collectionPath = selectedCollection ? `/collections/${selectedCollection}` : '/collections/all';
+    navigate(query ? `${collectionPath}?q=${encodeURIComponent(query)}` : collectionPath);
   };
 
   const handleLogout = () => {
@@ -44,118 +47,131 @@ export function Navbar() {
     navigate('/');
   };
 
+  const accountLabel = user ? `Hello, ${user.displayName.split(' ')[0]}` : 'Sign in';
+  const accountPath = isAuthenticated ? '/account' : '/login';
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-white shadow-sm">
-      <div className="bg-[#ef7056] px-4 py-2 text-center text-[11px] font-semibold tracking-[0.12em] text-white sm:text-xs">
-        A NEW SEASON, A NEW STORY <span className="mx-2 opacity-70">·</span> DISCOVER WENDE
+    <header className="sticky top-0 z-50 w-full bg-white">
+      <div className="bg-[#f5f5f5] px-4 py-1.5 text-center text-[10px] tracking-wide text-[#555] sm:text-left">
+        <div className="container mx-auto flex items-center justify-between">
+          <span>Free delivery on orders over 5,000 ETB</span>
+          <span className="hidden sm:inline">Thoughtful Ethiopian fashion · Welcome to Wende</span>
+        </div>
       </div>
-      <div className="container mx-auto flex min-h-[76px] items-center gap-3 px-4 py-3 lg:gap-8 lg:px-8">
-        <button
-          type="button"
-          className="rounded p-2 text-gray-800 hover:bg-gray-100 lg:hidden"
-          aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={isMobileMenuOpen}
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        >
-          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
 
-        <Link to="/" className="flex shrink-0 flex-col leading-none" aria-label="Wende home">
-          <span className="text-[25px] font-black tracking-[0.1em] text-[#202020]">WENDE<span className="text-[#ef7056]">.</span></span>
-          <span className="mt-1 text-[8px] font-semibold tracking-[0.28em] text-gray-500">FASHION WITH A STORY</span>
-        </Link>
+      <div className="container mx-auto grid min-h-[72px] grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-2 sm:gap-6 sm:px-5 lg:grid-cols-[190px_minmax(250px,1fr)_auto] lg:px-8">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="rounded p-2 text-gray-800 hover:bg-gray-100 lg:hidden"
+            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={isMobileMenuOpen}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+          <Link to="/" className="flex shrink-0 flex-col leading-none" aria-label="Wende home">
+            <span className="text-[22px] font-black tracking-[0.08em] text-[#222] sm:text-[27px]">WENDE<span className="text-[#e57c45]">.</span></span>
+            <span className="mt-1 text-[7px] font-semibold tracking-[0.25em] text-gray-500 sm:text-[8px]">FASHION WITH A STORY</span>
+          </Link>
+        </div>
 
-        <form onSubmit={handleSearch} role="search" className="order-last flex h-10 w-full overflow-hidden rounded-sm border border-gray-200 bg-white sm:order-none sm:ml-auto sm:w-auto sm:flex-1 lg:mx-8 lg:max-w-xl">
-          <label htmlFor="store-search" className="sr-only">Search Wende</label>
+        <form onSubmit={handleSearch} role="search" className="col-span-3 order-last flex h-10 w-full overflow-hidden rounded-sm border border-[#dedede] bg-white sm:col-span-1 sm:order-none lg:mx-5">
+          <label htmlFor="store-search-category" className="sr-only">Search category</label>
+          <select
+            id="store-search-category"
+            aria-label="Search in category"
+            value={selectedCollection}
+            onChange={(event) => setSelectedCollection(event.target.value)}
+            className="hidden max-w-[130px] border-r border-[#dedede] bg-[#f6f6f6] px-2 text-xs text-gray-700 outline-none sm:block"
+          >
+            <option value="">All Categories</option>
+            {collections.map((collection) => (
+              <option key={collection.id} value={collection.slug}>{collection.name}</option>
+            ))}
+          </select>
+          <label htmlFor="store-search" className="sr-only">Search Wende products</label>
           <Input
             id="store-search"
             type="search"
-            placeholder="Search styles, shoes and more"
+            placeholder="Search products..."
             value={searchQuery}
             maxLength={120}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent px-3 text-sm shadow-none focus-visible:ring-0"
+            className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent px-3 text-xs shadow-none focus-visible:ring-0 sm:text-sm"
           />
-          <Button type="submit" variant="ghost" aria-label="Search" className="h-full rounded-none px-3 text-gray-700 hover:bg-[#fdf0ed] hover:text-[#d95e45]">
+          <Button type="submit" aria-label="Search" className="h-full rounded-none bg-[#e77b43] px-4 text-white hover:bg-[#d96831]">
             <Search className="h-4 w-4" />
           </Button>
         </form>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1 sm:ml-0 sm:gap-2">
-          <Link
-            to={isAuthenticated ? '/account' : '/login'}
-            aria-label={user ? `Account for ${user.displayName}` : 'Sign in'}
-            className="hidden items-center gap-2 rounded-sm px-2 py-2 text-gray-800 hover:bg-gray-50 sm:flex"
-          >
-            <UserRound className="h-5 w-5" />
-            <span className="hidden text-left leading-tight md:block">
-              <span className="block text-[10px] text-gray-500">{user ? `Hello, ${user.displayName.split(' ')[0]}` : 'Welcome'}</span>
-              <span className="block text-xs font-semibold">{user ? 'My account' : 'Sign in'}</span>
+        <div className="flex items-center justify-end gap-1 sm:gap-3">
+          <Link to={accountPath} aria-label={accountLabel} className="flex items-center gap-2 text-gray-800 hover:text-[#d96831]">
+            <UserRound className="h-[19px] w-[19px]" />
+            <span className="hidden leading-tight md:block">
+              <span className="block text-[10px] text-gray-500">{user ? accountLabel : 'Hello, welcome'}</span>
+              <span className="block text-xs font-semibold">{user ? 'My account' : 'Sign in / Register'}</span>
             </span>
           </Link>
-          <Link to="/account/wishlist" aria-label="Wishlist" className="hidden rounded-sm p-2 text-gray-800 hover:bg-gray-50 sm:block">
-            <Heart className="h-5 w-5" />
+          <Link to="/account/wishlist" aria-label="Wishlist" className="hidden rounded p-2 text-gray-800 hover:text-[#d96831] sm:block">
+            <Heart className="h-[19px] w-[19px]" />
           </Link>
+          {user?.isAdmin && (
+            <Link to="/admin/products" aria-label="Manage products" title="Manage products" className="hidden rounded p-2 text-gray-800 hover:text-[#d96831] md:block">
+              <Settings className="h-[19px] w-[19px]" />
+            </Link>
+          )}
+          {isAuthenticated && (
+            <button type="button" onClick={handleLogout} aria-label="Log out" title="Log out" className="hidden rounded p-2 text-gray-700 hover:text-[#d96831] lg:block">
+              <LogOut className="h-[19px] w-[19px]" />
+            </button>
+          )}
           <button
             type="button"
             aria-label={`Open bag, ${totalCount} items`}
             onClick={() => setIsCartOpen(true)}
-            className="relative rounded-sm p-2 text-gray-800 hover:bg-gray-50"
+            className="relative rounded p-2 text-gray-800 hover:text-[#d96831]"
           >
-            <ShoppingBag className="h-5 w-5" />
+            <ShoppingBag className="h-[20px] w-[20px]" />
             {totalCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ef7056] px-1 text-[10px] font-bold text-white">
+              <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#e77b43] px-1 text-[10px] font-bold text-white">
                 {totalCount}
               </span>
             )}
           </button>
-          {user?.isAdmin && (
-            <Link to="/admin/products" aria-label="Manage products" title="Manage products" className="hidden rounded-sm p-2 text-gray-800 hover:bg-gray-50 md:block">
-              <Settings className="h-5 w-5" />
-            </Link>
-          )}
-          {isAuthenticated && (
-            <button type="button" onClick={handleLogout} aria-label="Log out" title="Log out" className="hidden items-center gap-1 rounded-sm px-2 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 sm:flex">
-              <LogOut className="h-4 w-4" />
-              <span className="hidden lg:inline">Log out</span>
-            </button>
-          )}
         </div>
       </div>
 
-      <nav aria-label="Shop categories" className="hidden border-t border-gray-100 lg:block">
-        <div className="container mx-auto flex items-center justify-center gap-7 overflow-x-auto px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-gray-700">
-          <Link to="/collections/all" className="shrink-0 transition-colors hover:text-[#ef7056]">Shop all</Link>
+      <nav aria-label="Shop categories" className="hidden border-y border-[#ededed] lg:block">
+        <div className="container mx-auto flex h-10 items-center justify-between gap-5 overflow-x-auto px-8 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3d3d3d]">
+          <Link to="/collections/all" className="shrink-0 hover:text-[#df713a]">Home</Link>
           {collections.map((collection) => (
-            <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 transition-colors hover:text-[#ef7056]">
+            <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 hover:text-[#df713a]">
               {collection.name}
             </Link>
           ))}
-          <Link to="/collections/all?sort=newest" className="shrink-0 transition-colors hover:text-[#ef7056]">New arrivals</Link>
+          <Link to="/collections/all?sort=newest" className="shrink-0 hover:text-[#df713a]">New arrivals</Link>
+          <Link to="/collections/all" className="shrink-0 text-[#df713a] hover:text-[#bf5525]">Shop all</Link>
         </div>
       </nav>
 
       {isMobileMenuOpen && (
-        <nav aria-label="Mobile shop menu" className="absolute left-0 top-full z-50 w-full border-t bg-white p-4 text-gray-900 shadow-lg lg:hidden">
-          <div className="mb-3 border-b pb-3">
-            <Link to={isAuthenticated ? '/account' : '/login'} className="flex items-center gap-2 font-semibold">
-              <UserRound className="h-5 w-5" />
-              {user ? `Hello, ${user.displayName}` : 'Sign in to your account'}
-            </Link>
-          </div>
+        <nav aria-label="Mobile shop menu" className="absolute left-0 top-full z-50 max-h-[75vh] w-full overflow-y-auto border-t bg-white p-4 text-gray-900 shadow-lg lg:hidden">
+          <Link to={accountPath} className="mb-3 flex items-center gap-2 border-b pb-3 font-semibold">
+            <UserRound className="h-5 w-5" /> {user ? `Hello, ${user.displayName}` : 'Sign in to your account'}
+          </Link>
           <Link to="/collections/all" className="block border-b py-3 font-semibold">Shop all</Link>
           {collections.map((collection) => (
             <Link key={collection.id} to={`/collections/${collection.slug}`} className="block border-b py-3">
               {collection.name}
             </Link>
           ))}
+          <Link to="/account/wishlist" className="block border-b py-3">Wishlist</Link>
           {user?.isAdmin && <Link to="/admin/products" className="block border-b py-3 font-semibold">Manage products</Link>}
-          {isAuthenticated ? (
-            <button type="button" onClick={handleLogout} className="flex w-full items-center gap-2 border-t py-3 text-left font-semibold text-[#d95e45]">
+          {isAuthenticated && (
+            <button type="button" onClick={handleLogout} className="flex w-full items-center gap-2 py-3 text-left font-semibold text-[#d96831]">
               <LogOut className="h-4 w-4" /> Log out
             </button>
-          ) : (
-            <Link to="/login" className="block border-t py-3 font-semibold">Sign in</Link>
           )}
         </nav>
       )}
