@@ -142,16 +142,16 @@ export function Navbar() {
         </div>
       </div>
 
-      <nav aria-label="Shop categories" className="hidden border-y border-[#ededed] lg:block">
-        <div className="container mx-auto flex h-10 items-center justify-between gap-5 overflow-x-auto px-8 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3d3d3d]">
-          <Link to="/" className="shrink-0 rounded-sm px-2 py-2 text-[#df713a] hover:bg-[#fff5ef]">Home</Link>
-          <Link to="/collections/all" className="shrink-0 rounded-sm px-2 py-2 text-[#c9602e] hover:bg-[#fff5ef]">Product Categories</Link>
+      <nav aria-label="Shop categories" className="border-y border-[#ededed] bg-[#fcfcfc]">
+        <div className="container mx-auto flex flex-col items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3d3d3d]">
+          <Link to="/" className="w-full py-1 text-center text-[#df713a] hover:bg-[#fff5ef]">Home</Link>
+          <Link to="/collections/all" className="w-full py-1 text-center text-[#c9602e] hover:bg-[#fff5ef]">Product Categories</Link>
           {collections.map((collection) => (
-            <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 px-1 py-2 hover:text-[#df713a]">
+            <Link key={collection.id} to={`/collections/${collection.slug}`} className="w-full py-1 text-center hover:bg-[#fff5ef] hover:text-[#df713a]">
               {collection.name}
             </Link>
           ))}
-          <Link to="/collections/all?sort=newest" className="shrink-0 px-1 py-2 hover:text-[#df713a]">New arrivals</Link>
+          <Link to="/collections/all?sort=newest" className="w-full py-1 text-center hover:bg-[#fff5ef] hover:text-[#df713a]">New arrivals</Link>
         </div>
       </nav>
 
@@ -160,17 +160,6 @@ export function Navbar() {
           <Link to={accountPath} className="mb-3 flex items-center gap-2 border-b pb-3 font-semibold">
             <UserRound className="h-5 w-5" /> {user ? `Hello, ${user.displayName}` : 'Sign in to your account'}
           </Link>
-          <Link to="/" className="block border-b py-3 font-semibold">Home</Link>
-          <div className="border-b pb-2 pt-4">
-            <p className="mb-1 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#d96831]">Product Categories</p>
-            <Link to="/collections/all" className="block border-b py-3 font-semibold">Shop all</Link>
-            {collections.map((collection) => (
-              <Link key={collection.id} to={`/collections/${collection.slug}`} className="block border-b py-3 last:border-0">
-                {collection.name}
-              </Link>
-            ))}
-            <Link to="/collections/all?sort=newest" className="block py-3 font-medium">New arrivals</Link>
-          </div>
           <Link to="/account/wishlist" className="block border-b py-3">Wishlist</Link>
           {user?.isAdmin && <Link to="/admin/products" className="block border-b py-3 font-semibold">Manage products</Link>}
           {isAuthenticated && (
