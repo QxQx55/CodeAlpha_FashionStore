@@ -145,6 +145,7 @@ export function Navbar() {
       <nav aria-label="Shop categories" className="hidden border-y border-[#ededed] lg:block">
         <div className="container mx-auto flex h-10 items-center justify-between gap-5 overflow-x-auto px-8 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3d3d3d]">
           <Link to="/" className="shrink-0 rounded-sm px-2 py-2 text-[#df713a] hover:bg-[#fff5ef]">Home</Link>
+          <Link to="/collections/all" className="shrink-0 rounded-sm px-2 py-2 text-[#c9602e] hover:bg-[#fff5ef]">Product Categories</Link>
           {collections.map((collection) => (
             <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 px-1 py-2 hover:text-[#df713a]">
               {collection.name}
