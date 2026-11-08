@@ -81,14 +81,102 @@ function validateCartQuantity(variantId, quantity) {
   return amount;
 }
 
+function createRateLimiter({ limit, windowMs }) {
+  const attempts = new Map();
+  return (req, res, next) => {
+    const now = Date.now();
+    let bucket = attempts.get(req.ip);
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+    }
+    bucket.count += 1;
+    attempts.set(req.ip, bucket);
+
+    if (attempts.size > 10000) {
+      for (const [ip, entry] of attempts) {
+        if (entry.resetAt <= now) attempts.delete(ip);
+      }
+      if (attempts.size > 10000) attempts.delete(attempts.keys().next().value);
+    }
+
+    const remaining = Math.max(0, limit - bucket.count);
+    const resetSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+    res.set('RateLimit-Limit', String(limit));
+    res.set('RateLimit-Remaining', String(remaining));
+    res.set('RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
+    if (bucket.count > limit) {
+      res.set('Retry-After', String(resetSeconds));
+      return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+    }
+    next();
+  };
+}
+
+function validateChapaPayment(order, providerResponse) {
+  const payment = providerResponse?.data;
+  if (String(payment?.status || '').toLowerCase() !== 'success') {
+    throw new HttpError(409, 'Chapa has not confirmed this payment.');
+  }
+  if (payment.tx_ref !== order.id) {
+    throw new HttpError(409, 'The payment reference does not match this order.');
+  }
+  if (String(payment.currency || '').toUpperCase() !== 'ETB') {
+    throw new HttpError(409, 'The payment currency does not match this order.');
+  }
+  const amount = Number(payment.amount);
+  if (!Number.isFinite(amount) || Math.round(amount * 100) !== Math.round(order.totalAmount * 100)) {
+    throw new HttpError(409, 'The verified payment amount does not match this order.');
+  }
+
+  const finalizeOrder = db.transaction(() => {
+    const currentOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+    if (!currentOrder) throw new HttpError(404, 'Order not found.');
+    if (currentOrder.status === 'processing') return currentOrder;
+    if (currentOrder.status !== 'pending') throw new HttpError(409, 'This order is no longer awaiting payment.');
+
+    const items = db.prepare('SELECT variantId, quantity FROM orderItems WHERE orderId = ?').all(order.id);
+    const updateStock = db.prepare('UPDATE productVariants SET stock = stock - ? WHERE id = ? AND stock >= ?');
+    for (const item of items) {
+      const result = updateStock.run(item.quantity, item.variantId, item.quantity);
+      if (result.changes !== 1) {
+        throw new HttpError(409, 'Payment succeeded, but an item is no longer available. Contact store support.');
+      }
+    }
+
+    db.prepare("UPDATE orders SET status = 'processing' WHERE id = ?").run(order.id);
+    db.prepare(`
+      DELETE FROM cartItems
+      WHERE userId = ? AND variantId IN (SELECT variantId FROM orderItems WHERE orderId = ?)
+    `).run(order.userId, order.id);
+    return db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  });
+  return finalizeOrder();
+}
+
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  app.use((_req, res, next) => {
+    res.set({
+      'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self'; connect-src 'self' https:",
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+    });
+    if (process.env.NODE_ENV === 'production') {
+      res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+  app.get('/api/payments/chapa/status', (_req, res) => {
+    res.json({ available: Boolean(process.env.CHAPA_SECRET_KEY) });
+  });
 
-  app.post('/api/auth/register', async (req, res, next) => {
+  app.post('/api/auth/register', createRateLimiter({ limit: 10, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
     try {
       const email = String(req.body?.email || '').trim().toLowerCase();
       const password = String(req.body?.password || '');
@@ -125,7 +213,7 @@ function createApp() {
     }
   });
 
-  app.post('/api/auth/login', async (req, res, next) => {
+  app.post('/api/auth/login', createRateLimiter({ limit: 10, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
     try {
       const email = String(req.body?.email || '').trim().toLowerCase();
       const password = String(req.body?.password || '');
@@ -199,9 +287,10 @@ function createApp() {
     res.json(db.prepare(sql).all(...values, limit));
   }
 
-  app.post('/api/checkout', authenticate, (req, res, next) => {
+  app.post('/api/checkout', authenticate, async (req, res, next) => {
     try {
       const address = req.body?.shippingAddress;
+      const paymentMethod = req.body?.paymentMethod;
       if (!address || typeof address !== 'object' || Array.isArray(address)) {
         throw new HttpError(400, 'Enter a valid shipping address.');
       }
@@ -218,8 +307,18 @@ function createApp() {
           throw new HttpError(400, `${field} is too long.`);
         }
       }
-      if (req.body?.paymentMethod !== 'cash_on_delivery') {
-        throw new HttpError(400, 'Choose cash on delivery to place this demo order.');
+      if (!['cash_on_delivery', 'chapa'].includes(paymentMethod)) {
+        throw new HttpError(400, 'Choose a supported payment method.');
+      }
+      if (paymentMethod === 'chapa' && !process.env.CHAPA_SECRET_KEY) {
+        throw new HttpError(503, 'Chapa payments are not configured. Set CHAPA_SECRET_KEY on the API server.');
+      }
+      if (paymentMethod === 'chapa' && String(address.phone || '').trim()) {
+        const digits = String(address.phone).replace(/\D/g, '');
+        const localNumber = digits.startsWith('251') ? `0${digits.slice(3)}` : digits;
+        if (!/^0[79]\d{8}$/.test(localNumber)) {
+          throw new HttpError(400, 'Enter an Ethiopian mobile number with 10 digits, or leave it blank.');
+        }
       }
 
       const cart = db.prepare(`
@@ -238,11 +337,28 @@ function createApp() {
       const shipping = subtotal > 5000 ? 0 : 250;
       const tax = subtotal * 0.15;
       const totalAmount = Math.round((subtotal + shipping + tax) * 100) / 100;
+      let appUrl;
+      if (paymentMethod === 'chapa') {
+        const publicAppUrl = process.env.PUBLIC_APP_URL
+          || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
+        try {
+          appUrl = new URL(publicAppUrl);
+        } catch {
+          throw new HttpError(503, 'Set PUBLIC_APP_URL to your storefront URL before enabling Chapa payments.');
+        }
+        if (!['http:', 'https:'].includes(appUrl.protocol)
+          || appUrl.username
+          || appUrl.password
+          || (process.env.NODE_ENV === 'production' && appUrl.protocol !== 'https:')) {
+          throw new HttpError(503, 'PUBLIC_APP_URL must be a valid HTTPS storefront URL in production.');
+        }
+      }
+      const orderId = crypto.randomUUID();
       const order = {
-        id: crypto.randomUUID(),
+        id: orderId,
         userId: req.user.id,
         totalAmount,
-        status: 'processing',
+        status: paymentMethod === 'chapa' ? 'pending' : 'processing',
         shippingAddress: JSON.stringify({
           email: String(address.email).trim(),
           firstName: String(address.firstName).trim(),
@@ -252,7 +368,7 @@ function createApp() {
           postalCode: String(address.postalCode).trim(),
           country: String(address.country || 'Ethiopia').trim(),
           phone: String(address.phone || '').trim(),
-          paymentMethod: 'cash_on_delivery',
+          paymentMethod,
         }),
         createdAt: new Date().toISOString(),
       };
@@ -266,17 +382,107 @@ function createApp() {
           INSERT INTO orderItems (id, orderId, variantId, quantity, price)
           VALUES (?, ?, ?, ?, ?)
         `);
-        const updateStock = db.prepare('UPDATE productVariants SET stock = stock - ? WHERE id = ? AND stock >= ?');
         for (const item of cart) {
           const price = Number(item.price ?? item.basePrice);
           insertItem.run(crypto.randomUUID(), order.id, item.variantId, item.quantity, price);
-          const result = updateStock.run(item.quantity, item.variantId, item.quantity);
-          if (result.changes !== 1) throw new HttpError(409, 'A cart item has just sold out. Please review your cart.');
         }
-        db.prepare('DELETE FROM cartItems WHERE userId = ?').run(req.user.id);
+        if (paymentMethod === 'cash_on_delivery') {
+          const updateStock = db.prepare('UPDATE productVariants SET stock = stock - ? WHERE id = ? AND stock >= ?');
+          for (const item of cart) {
+            const result = updateStock.run(item.quantity, item.variantId, item.quantity);
+            if (result.changes !== 1) throw new HttpError(409, 'A cart item has just sold out. Please review your cart.');
+          }
+          db.prepare('DELETE FROM cartItems WHERE userId = ?').run(req.user.id);
+        }
       });
       createOrder();
-      res.status(201).json(order);
+
+      if (paymentMethod === 'cash_on_delivery') {
+        return res.status(201).json(order);
+      }
+
+      const digits = String(address.phone || '').replace(/\D/g, '');
+      const phoneNumber = digits ? (digits.startsWith('251') ? `0${digits.slice(3)}` : digits) : '';
+      const paymentPayload = {
+        amount: totalAmount.toFixed(2),
+        currency: 'ETB',
+        email: String(address.email).trim(),
+        first_name: String(address.firstName).trim(),
+        last_name: String(address.lastName).trim(),
+        tx_ref: order.id,
+        return_url: new URL(`/checkout/complete?tx_ref=${encodeURIComponent(order.id)}`, appUrl).toString(),
+        customization: {
+          title: 'Wende Market',
+          description: `Order ${order.id}`,
+        },
+      };
+      if (phoneNumber) paymentPayload.phone_number = phoneNumber;
+
+      let chapaResponse;
+      try {
+        chapaResponse = await fetch('https://api.chapa.co/v1/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.CHAPA_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(paymentPayload),
+        });
+      } catch {
+        db.prepare("UPDATE orders SET status = 'payment_failed' WHERE id = ?").run(order.id);
+        throw new HttpError(502, 'Could not connect to Chapa. Your cart has not been charged; please try again.');
+      }
+      const chapaResult = await chapaResponse.json().catch(() => null);
+      if (!chapaResponse.ok || chapaResult?.status !== 'success' || !chapaResult?.data?.checkout_url) {
+        db.prepare("UPDATE orders SET status = 'payment_failed' WHERE id = ?").run(order.id);
+        throw new HttpError(502, 'Chapa could not start the payment. Your cart has not been charged; please try again.');
+      }
+      let paymentUrl;
+      try {
+        paymentUrl = new URL(chapaResult.data.checkout_url);
+      } catch {
+        db.prepare("UPDATE orders SET status = 'payment_failed' WHERE id = ?").run(order.id);
+        throw new HttpError(502, 'Chapa returned an invalid payment link.');
+      }
+      if (paymentUrl.protocol !== 'https:' || paymentUrl.hostname !== 'checkout.chapa.co') {
+        db.prepare("UPDATE orders SET status = 'payment_failed' WHERE id = ?").run(order.id);
+        throw new HttpError(502, 'Chapa returned an invalid payment link.');
+      }
+      res.status(201).json({
+        orderId: order.id,
+        txRef: order.id,
+        paymentUrl: paymentUrl.toString(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/payments/chapa/verify/:txRef', authenticate, async (req, res, next) => {
+    try {
+      const txRef = String(req.params.txRef || '');
+      if (!/^[0-9a-f-]{36}$/i.test(txRef)) throw new HttpError(400, 'Invalid payment reference.');
+      const order = db.prepare('SELECT * FROM orders WHERE id = ? AND userId = ?').get(txRef, req.user.id);
+      if (!order) throw new HttpError(404, 'Order not found.');
+      if (order.status === 'processing') return res.json(order);
+      if (order.status !== 'pending') throw new HttpError(409, 'This order is no longer awaiting payment.');
+      if (!process.env.CHAPA_SECRET_KEY) {
+        throw new HttpError(503, 'Chapa payments are not configured on the API server.');
+      }
+
+      let chapaResponse;
+      try {
+        chapaResponse = await fetch(`https://api.chapa.co/v1/transaction/verify/${encodeURIComponent(txRef)}`, {
+          headers: { Authorization: `Bearer ${process.env.CHAPA_SECRET_KEY}` },
+        });
+      } catch {
+        throw new HttpError(502, 'Could not verify the payment with Chapa. Please try again.');
+      }
+      const chapaResult = await chapaResponse.json().catch(() => null);
+      if (!chapaResponse.ok || chapaResult?.status !== 'success') {
+        throw new HttpError(502, 'Chapa could not verify this payment. Please try again.');
+      }
+      res.json(validateChapaPayment(order, chapaResult));
     } catch (error) {
       next(error);
     }

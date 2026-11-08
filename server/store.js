@@ -122,10 +122,20 @@ export function initializeDatabase() {
     INSERT OR IGNORE INTO productVariants (id, productId, size, color, material, price, stock, imageUrls)
     VALUES (@id, @productId, @size, @color, @material, @price, @stock, @imageUrls)
   `);
+  const updateDemoProductImage = db.prepare(`
+    UPDATE products SET imageUrl = @imageUrl WHERE id = @id AND id LIKE 'demo_%'
+  `);
+  const updateDemoVariantImages = db.prepare(`
+    UPDATE productVariants SET imageUrls = ? WHERE productId = ? AND productId LIKE 'demo_%'
+  `);
   const seed = db.transaction(() => {
     collections.forEach((collection) => insertCollection.run(collection));
     products.forEach((product) => insertProduct.run(product));
     productVariants.forEach((variant) => insertVariant.run(variant));
+    products.filter((product) => product.id.startsWith('demo_')).forEach((product) => {
+      updateDemoProductImage.run(product);
+      updateDemoVariantImages.run(JSON.stringify([product.imageUrl]), product.id);
+    });
   });
   seed();
 }

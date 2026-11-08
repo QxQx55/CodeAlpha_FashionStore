@@ -199,3 +199,149 @@ test('registers customers and places orders using current database prices and st
   });
   assert.equal(invalidProduct.response.status, 400);
 });
+
+test('sets security headers and limits repeated sign-in attempts', async () => {
+  const health = await request('/api/health');
+  assert.equal(health.response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(health.response.headers.get('x-frame-options'), 'DENY');
+  assert.equal(health.response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+  assert.match(health.response.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+
+  let throttledResponse;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const result = await request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: `unknown-${attempt}@example.com`, password: 'wrong-password' }),
+    });
+    if (result.response.status === 429) {
+      throttledResponse = result.response;
+      break;
+    }
+  }
+  assert.ok(throttledResponse, 'repeated sign-in attempts should be throttled');
+  assert.ok(Number(throttledResponse.headers.get('retry-after')) > 0);
+});
+
+test('seeds at least ten category-matched products into every active category', async () => {
+  const [categories, products] = await Promise.all([
+    request('/api/collections?limit=200'),
+    request('/api/products?limit=200'),
+  ]);
+  assert.equal(categories.response.status, 200);
+  assert.equal(products.response.status, 200);
+  const categoryNamePrefixes = {
+    Men: ["Men's"],
+    Women: ["Women's"],
+    Kids: ['Kids '],
+    Shoes: ['Shoes -'],
+    'Traditional Wear': ['Traditional Wear -'],
+    Accessories: ['Accessories -'],
+    Outerwear: ['Outerwear -'],
+    Activewear: ['Activewear -'],
+  };
+  for (const category of categories.body) {
+    const categoryProducts = products.body.filter((product) => product.collectionId === category.id);
+    assert.ok(categoryProducts.length >= 10, `expected at least ten products in ${category.name}, got ${categoryProducts.length}`);
+    const expectedPrefixes = categoryNamePrefixes[category.name];
+    assert.ok(expectedPrefixes, `missing product-name rule for ${category.name}`);
+    const matchingProducts = categoryProducts.filter((product) => expectedPrefixes.some((prefix) => product.name.startsWith(prefix)));
+    assert.ok(matchingProducts.length >= 8, `expected category-matched demo products in ${category.name}`);
+  }
+  const imageUrls = products.body.map((product) => product.imageUrl);
+  assert.equal(new Set(imageUrls).size, imageUrls.length, 'every product must have a distinct main photo');
+  const names = products.body.map((product) => product.name.trim().toLowerCase());
+  assert.equal(new Set(names).size, names.length, 'product names must be unique');
+});
+
+test('initializes Chapa checkout and only processes an order after verifying payment', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalSecret = process.env.CHAPA_SECRET_KEY;
+  const originalAppUrl = process.env.PUBLIC_APP_URL;
+  const providerCalls = [];
+  process.env.CHAPA_SECRET_KEY = 'CHASECK_TEST_example';
+  process.env.PUBLIC_APP_URL = 'http://localhost:3000';
+
+  globalThis.fetch = async (input, options) => {
+    if (String(input).startsWith(baseUrl)) return originalFetch(input, options);
+    providerCalls.push({ url: String(input), options });
+    if (String(input).endsWith('/transaction/initialize')) {
+      const payload = JSON.parse(options.body);
+      return new Response(JSON.stringify({
+        status: 'success',
+        data: { checkout_url: 'https://checkout.chapa.co/checkout/payment/demo', tx_ref: payload.tx_ref },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    const txRef = String(input).split('/').pop();
+    const initializePayload = JSON.parse(providerCalls[0].options.body);
+    return new Response(JSON.stringify({
+      status: 'success',
+      data: { status: 'success', tx_ref: txRef, amount: initializePayload.amount, currency: 'ETB' },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+
+  try {
+    const registration = await request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'chapa-shopper@example.com', password: 'secure-password-3', displayName: 'Chapa Shopper' }),
+    });
+    assert.equal(registration.response.status, 201);
+    const token = registration.body.token;
+    const variantBefore = (await request('/api/productVariants?where=%7B%22id%22%3A%22variant_demo_men_1_s%22%7D')).body[0];
+    assert.ok(variantBefore.stock > 0);
+
+    await request('/api/cartItems', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ variantId: variantBefore.id, quantity: 2 }),
+    });
+    const checkout = await request('/api/checkout', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        paymentMethod: 'chapa',
+        shippingAddress: {
+          email: 'chapa-shopper@example.com',
+          firstName: 'Chapa',
+          lastName: 'Shopper',
+          address: '1 Market Street',
+          city: 'Addis Ababa',
+          postalCode: '1000',
+          phone: '+251 911 234 567',
+        },
+      }),
+    });
+    assert.equal(checkout.response.status, 201);
+    assert.match(checkout.body.paymentUrl, /^https:\/\/checkout\.chapa\.co\//);
+    const initialization = JSON.parse(providerCalls[0].options.body);
+    assert.equal(initialization.amount, '4735.00');
+    assert.equal(initialization.currency, 'ETB');
+    assert.equal(initialization.phone_number, '0911234567');
+    assert.equal(initialization.return_url, `http://localhost:3000/checkout/complete?tx_ref=${checkout.body.txRef}`);
+    assert.equal(providerCalls[0].options.headers.Authorization, 'Bearer CHASECK_TEST_example');
+
+    const pendingOrder = (await request(`/api/orders?where=${encodeURIComponent(JSON.stringify({ id: checkout.body.orderId }))}`, { token })).body[0];
+    assert.equal(pendingOrder.status, 'pending');
+    assert.equal(JSON.parse(pendingOrder.shippingAddress).paymentMethod, 'chapa');
+    const stockBeforeVerification = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantBefore.id }))}`)).body[0].stock;
+    assert.equal(stockBeforeVerification, variantBefore.stock);
+
+    const verification = await request(`/api/payments/chapa/verify/${checkout.body.txRef}`, { token });
+    assert.equal(verification.response.status, 200);
+    assert.equal(verification.body.status, 'processing');
+    const variantAfterVerification = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantBefore.id }))}`)).body[0];
+    assert.equal(variantAfterVerification.stock, variantBefore.stock - 2);
+    const cartAfterVerification = await request('/api/cartItems', { token });
+    assert.deepEqual(cartAfterVerification.body, []);
+
+    const repeatedVerification = await request(`/api/payments/chapa/verify/${checkout.body.txRef}`, { token });
+    assert.equal(repeatedVerification.response.status, 200);
+    assert.equal(providerCalls.length, 2, 'a completed order should not be verified or charged twice');
+    assert.equal((await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantBefore.id }))}`)).body[0].stock, variantBefore.stock - 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalSecret === undefined) delete process.env.CHAPA_SECRET_KEY;
+    else process.env.CHAPA_SECRET_KEY = originalSecret;
+    if (originalAppUrl === undefined) delete process.env.PUBLIC_APP_URL;
+    else process.env.PUBLIC_APP_URL = originalAppUrl;
+  }
+});
