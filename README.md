@@ -65,7 +65,7 @@ Vercel serves the frontend. The Express + SQLite API needs a persistent Node.js 
 4. If using Chapa, set `CHAPA_SECRET_KEY` in Render. Set `ADMIN_EMAIL` there before registering the store owner account.
 5. After uploading your real product data and photos and confirming stock, set `STORE_MODE=live` in Render and `VITE_CATALOG_MODE=live` in Vercel, then redeploy both. Until then, checkout is blocked by the API and the frontend labels the catalog as preview-only.
 
-`VITE_API_URL` is public and must never contain secrets. `render.yaml` allows the current Vercel deployment domains via `CORS_ORIGINS`; add any custom storefront domain there before deployment. `PUBLIC_APP_URL` is used for payment return links. The frontend uses Vite's local API proxy when `VITE_API_URL` is unset.
+The Render Blueprint allows `https://www.codealpha.tech` and `https://codealpha.tech` as storefront origins and uses `https://www.codealpha.tech` for payment return links. Attach the custom domain to the Vercel project and set `VITE_API_URL` in Vercel to the deployed Render API origin before redeploying. `VITE_API_URL` is public and must never contain secrets. `PUBLIC_APP_URL` is used for payment return links. The frontend uses Vite's local API proxy when `VITE_API_URL` is unset.
 
 Until your actual product names, prices, stock, and product photos are loaded, the storefront intentionally identifies its built-in catalog as preview/sample inventory. It must not be used to accept real orders. The photos currently in the sample catalog are stock imagery, not product photos or proof of actual inventory. Google Images is a search engine, not a license to copy photos; use your own product photos or images you have permission to use.
 

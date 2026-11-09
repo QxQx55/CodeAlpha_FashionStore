@@ -8,7 +8,7 @@ const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wende-store-te
 process.env.DB_PATH = path.join(temporaryDirectory, 'store.sqlite');
 process.env.JWT_SECRET = 'test-secret';
 process.env.ADMIN_EMAIL = 'admin@example.com';
-process.env.CORS_ORIGINS = 'https://code-alpha-fashion-store-zuw8.vercel.app,https://code-alpha-fashion-store.vercel.app';
+process.env.CORS_ORIGINS = 'https://www.codealpha.tech,https://codealpha.tech,https://code-alpha-fashion-store-zuw8.vercel.app,https://code-alpha-fashion-store.vercel.app';
 process.env.STORE_MODE = 'live';
 const { createApp } = await import('./index.js');
 const { db } = await import('./store.js');
@@ -35,6 +35,14 @@ async function request(route, { token, ...options } = {}) {
   const body = response.status === 204 ? null : await response.json();
   return { response, body };
 }
+
+test('allows storefront requests from the custom production domains', async () => {
+  for (const origin of ['https://www.codealpha.tech', 'https://codealpha.tech']) {
+    const response = await fetch(`${baseUrl}/api/health`, { headers: { Origin: origin } });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), origin);
+  }
+});
 
 test('registers customers and places orders using current database prices and stock', async () => {
   const catalog = await request('/api/products?where=%7B%22slug%22%3A%22classic-mens-habesha-kemis%22%7D');

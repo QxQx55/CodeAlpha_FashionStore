@@ -18,8 +18,8 @@ services:
       - key: DB_PATH
         value: /var/data/store.sqlite
       - key: CORS_ORIGINS
-        value: https://code-alpha-fashion-store-zuw8.vercel.app,https://code-alpha-fashion-store.vercel.app
+        value: https://www.codealpha.tech,https://codealpha.tech,https://code-alpha-fashion-store-zuw8.vercel.app,https://code-alpha-fashion-store.vercel.app
       - key: PUBLIC_APP_URL
-        value: https://code-alpha-fashion-store-zuw8.vercel.app
+        value: https://www.codealpha.tech
       - key: STORE_MODE
         value: preview
