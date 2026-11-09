@@ -14,6 +14,19 @@ interface CollectionLink {
   slug: string;
 }
 
+const collectionOrder = ['women', 'men', 'kids', 'shoes', 'traditional', 'accessories', 'outerwear', 'activewear'];
+
+function sortCollections(collections: CollectionLink[]) {
+  return [...collections].sort((a, b) => {
+    const aOrder = collectionOrder.indexOf(a.slug);
+    const bOrder = collectionOrder.indexOf(b.slug);
+    if (aOrder === -1 && bOrder === -1) return a.name.localeCompare(b.name);
+    if (aOrder === -1) return 1;
+    if (bOrder === -1) return -1;
+    return aOrder - bOrder;
+  });
+}
+
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,10 +39,10 @@ export function Navbar() {
 
   useEffect(() => {
     storeApi.db.collections.list({ where: { active: '1' } })
-      .then((data) => setCollections(data.length > 0 ? data : MOCK_COLLECTIONS))
+      .then((data) => setCollections(sortCollections(data.length > 0 ? data : MOCK_COLLECTIONS)))
       .catch((error) => {
         console.error('Failed to fetch collections:', error);
-        setCollections(MOCK_COLLECTIONS);
+        setCollections(sortCollections(MOCK_COLLECTIONS));
       });
   }, []);
 
