@@ -156,6 +156,12 @@ function validateChapaPayment(order, providerResponse) {
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  const allowedOrigins = new Set(
+    String(process.env.CORS_ORIGINS || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  );
   app.use((_req, res, next) => {
     res.set({
       'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self'; connect-src 'self' https:",
@@ -166,6 +172,22 @@ function createApp() {
     });
     if (process.env.NODE_ENV === 'production') {
       res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
+  app.use((req, res, next) => {
+    const origin = req.get('origin');
+    if (origin && allowedOrigins.has(origin)) {
+      res.set({
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        Vary: 'Origin',
+      });
+    }
+    if (req.method === 'OPTIONS') {
+      if (origin && !allowedOrigins.has(origin)) return res.status(403).end();
+      return res.status(204).end();
     }
     next();
   });

@@ -21,6 +21,7 @@ export type CheckoutResult = StoreOrder | {
 };
 
 const TOKEN_KEY = 'wende_store_token';
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') ?? '';
 type AuthListener = (state: { user: StoreUser | null; isLoading: boolean }) => void;
 const authListeners = new Set<AuthListener>();
 
@@ -44,7 +45,7 @@ export async function apiRequest<T = any>(path: string, options: RequestInit = {
 
   let response: Response;
   try {
-    response = await fetch(path, { ...options, headers });
+    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
   } catch {
     throw new Error('Could not reach the store server. Make sure the API is running and try again.');
   }

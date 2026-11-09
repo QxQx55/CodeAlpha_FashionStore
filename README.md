@@ -55,6 +55,20 @@ npm start
 
 The Express server serves the built frontend and API on the same port (default `4000`). Set `JWT_SECRET` to a long, unique secret and configure `PORT` as needed. Set `DB_PATH` to a persistent writable file path when deploying so SQLite data survives restarts. Set `ADMIN_EMAIL` before registering your administrator account. For Chapa, set `CHAPA_SECRET_KEY` and `PUBLIC_APP_URL` on the API server; use HTTPS in production. The default development JWT secret is rejected in production unless `JWT_SECRET` is set.
 
+## Deploying the frontend to Vercel
+
+Vercel serves the Vite frontend, but it does not run this app's long-lived Express + SQLite server as a static deployment. Deploy the Express app separately on a Node.js host with a persistent disk, and set its `DB_PATH` to a file on that disk. Configure the API host with:
+
+- `NODE_ENV=production`
+- `JWT_SECRET` (at least 32 characters)
+- `DB_PATH` (on persistent storage)
+- `CORS_ORIGINS=https://code-alpha-fashion-store.vercel.app` (include any other exact storefront origins, comma-separated)
+- `PUBLIC_APP_URL=https://code-alpha-fashion-store.vercel.app`
+
+In the Vercel project settings, set `VITE_API_URL` to the API host's HTTPS origin (for example, `https://your-api-host.example.com`) for Production, then redeploy. This value is public and must not contain secrets. The frontend uses the Vite dev-server proxy locally when `VITE_API_URL` is unset.
+
+Vercel's build configuration is in `vercel.json`. The API health check is `GET /api/health`. Configure `CHAPA_SECRET_KEY` only on the API host if hosted checkout is needed.
+
 ## API
 
 - `GET /api/health`

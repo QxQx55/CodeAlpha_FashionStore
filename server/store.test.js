@@ -8,6 +8,7 @@ const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wende-store-te
 process.env.DB_PATH = path.join(temporaryDirectory, 'store.sqlite');
 process.env.JWT_SECRET = 'test-secret';
 process.env.ADMIN_EMAIL = 'admin@example.com';
+process.env.CORS_ORIGINS = 'https://code-alpha-fashion-store.vercel.app';
 const { createApp } = await import('./index.js');
 let server;
 let baseUrl;
@@ -206,6 +207,28 @@ test('sets security headers and limits repeated sign-in attempts', async () => {
   assert.equal(health.response.headers.get('x-frame-options'), 'DENY');
   assert.equal(health.response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
   assert.match(health.response.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+
+  const allowedOrigin = await fetch(`${baseUrl}/api/health`, {
+    headers: { Origin: 'https://code-alpha-fashion-store.vercel.app' },
+  });
+  assert.equal(allowedOrigin.headers.get('access-control-allow-origin'), 'https://code-alpha-fashion-store.vercel.app');
+
+  const preflight = await fetch(`${baseUrl}/api/health`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://code-alpha-fashion-store.vercel.app',
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'authorization,content-type',
+    },
+  });
+  assert.equal(preflight.status, 204);
+  assert.match(preflight.headers.get('access-control-allow-methods'), /POST/);
+
+  const rejectedOrigin = await fetch(`${baseUrl}/api/health`, {
+    method: 'OPTIONS',
+    headers: { Origin: 'https://attacker.example' },
+  });
+  assert.equal(rejectedOrigin.status, 403);
 
   let throttledResponse;
   for (let attempt = 0; attempt < 12; attempt += 1) {
