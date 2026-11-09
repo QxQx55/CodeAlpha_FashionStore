@@ -98,6 +98,7 @@ export function Home() {
     .map((slug) => collections.find((collection) => collection.slug === slug))
     .filter((collection): collection is Collection => Boolean(collection));
   const categoryCards = featuredCollections.length === 3 ? featuredCollections : collections.slice(0, 3);
+  const previewNotice = loadError || 'Sample listings only: this preview catalog is not live inventory. Shopping is disabled until the real catalog is loaded.';
 
   return (
     <main className="bg-white pb-14">
@@ -168,7 +169,7 @@ export function Home() {
 
       {(previewCatalog || loadError) && (
         <p role="status" className="container mx-auto max-w-[1050px] px-3 py-3 text-center text-sm text-red-700 sm:px-5">
-          Preview catalog: {loadError || 'These are sample listings, not confirmed products or inventory. Shopping is disabled until your real catalog is loaded.'}
+          Preview mode: {previewNotice}
         </p>
       )}
 
