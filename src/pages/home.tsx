@@ -83,7 +83,9 @@ export function Home() {
       } catch (error) {
         console.error('Failed to load storefront content:', error);
         if (active) {
-          setLoadError(error instanceof Error ? error.message : 'The store catalog is temporarily unavailable.');
+          setCollections(MOCK_COLLECTIONS);
+          setProducts(MOCK_PRODUCTS);
+          setLoadError('Showing the demo catalog. Customer accounts, cart, and checkout need the store API.');
         }
       }
     };
@@ -171,7 +173,7 @@ export function Home() {
 
       {loadError && (
         <p role="status" className="container mx-auto max-w-[1050px] px-3 py-3 text-center text-sm text-red-700 sm:px-5">
-          Store catalog unavailable: {loadError}
+          Demo storefront: {loadError}
         </p>
       )}
 

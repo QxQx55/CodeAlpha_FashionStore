@@ -162,6 +162,31 @@ export function CollectionDetail() {
         }
       } catch (error) {
         console.error('Failed to fetch collection detail:', error);
+        setCategories(MOCK_COLLECTIONS);
+        if (slug === 'all') {
+          setCollection({ name: 'All Products', description: 'Browse our entire catalog of premium fashion.' });
+          setProducts(MOCK_PRODUCTS.map((product) => ({
+            ...product,
+            gender: product.collectionId === 'coll_men' ? 'men' : product.collectionId === 'coll_women' ? 'women' : 'unisex',
+            sizes: ['One Size'],
+            colors: [],
+          })));
+        } else {
+          const mockCollection = MOCK_COLLECTIONS.find((item) => item.slug === slug);
+          if (mockCollection) {
+            setCollection(mockCollection);
+            setProducts(MOCK_PRODUCTS
+              .filter((product) => product.collectionId === mockCollection.id)
+              .map((product) => ({
+                ...product,
+                gender: mockCollection.slug === 'men' || mockCollection.slug === 'women' || mockCollection.slug === 'kids'
+                  ? mockCollection.slug
+                  : 'unisex',
+                sizes: ['One Size'],
+                colors: [],
+              })));
+          }
+        }
       } finally {
         setLoading(false);
       }

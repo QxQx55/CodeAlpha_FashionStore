@@ -6,6 +6,7 @@ import { useAuth } from './auth-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { storeApi } from '@/lib/store-api';
+import { MOCK_COLLECTIONS } from '@/lib/mock-data';
 
 interface CollectionLink {
   id: string;
@@ -25,8 +26,11 @@ export function Navbar() {
 
   useEffect(() => {
     storeApi.db.collections.list({ where: { active: '1' } })
-      .then(setCollections)
-      .catch((error) => console.error('Failed to fetch collections:', error));
+      .then((data) => setCollections(data.length > 0 ? data : MOCK_COLLECTIONS))
+      .catch((error) => {
+        console.error('Failed to fetch collections:', error);
+        setCollections(MOCK_COLLECTIONS);
+      });
   }, []);
 
   useEffect(() => {

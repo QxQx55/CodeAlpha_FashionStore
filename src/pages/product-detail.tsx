@@ -32,6 +32,7 @@ export function ProductDetail() {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [previewCatalog, setPreviewCatalog] = useState(false);
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
@@ -48,6 +49,7 @@ export function ProductDetail() {
           // Try mock data
           const mockProd = MOCK_PRODUCTS.find(p => p.slug === slug);
           if (mockProd) {
+            setPreviewCatalog(true);
             setProduct(mockProd);
             const mockVars = MOCK_VARIANTS.filter(v => v.productId === mockProd.id).map(v => ({
               ...v,
@@ -74,6 +76,30 @@ export function ProductDetail() {
         }
       } catch (error) {
         console.error('Failed to fetch product detail:', error);
+        const mockProduct = MOCK_PRODUCTS.find((item) => item.slug === slug);
+        if (mockProduct) {
+          setPreviewCatalog(true);
+          setProduct(mockProduct);
+          const mockVariants = MOCK_VARIANTS
+            .filter((variant) => variant.productId === mockProduct.id)
+            .map((variant) => ({
+              ...variant,
+              imageUrls: JSON.stringify(mockProduct.images),
+            }));
+          const productVariants = mockVariants.length > 0
+            ? mockVariants
+            : [{
+              id: `preview-${mockProduct.id}`,
+              productId: mockProduct.id,
+              size: 'One Size',
+              color: 'Default',
+              price: mockProduct.basePrice,
+              stock: 0,
+              imageUrls: JSON.stringify(mockProduct.images),
+            }];
+          setVariants(productVariants);
+          setSelectedVariant(productVariants[0]);
+        }
       } finally {
         setLoading(false);
       }
@@ -330,10 +356,10 @@ export function ProductDetail() {
 
             <Button 
               className="w-full h-14 uppercase tracking-widest font-bold text-sm"
-              disabled={!selectedVariant || selectedVariant.stock === 0}
+              disabled={previewCatalog || !selectedVariant || selectedVariant.stock === 0}
               onClick={() => addItem(selectedVariant.id, 1)}
             >
-              {selectedVariant?.stock === 0 ? 'Out of Stock' : 'Add to Bag'}
+              {previewCatalog ? 'Cart unavailable in preview' : selectedVariant?.stock === 0 ? 'Out of Stock' : 'Add to Bag'}
             </Button>
           </div>
 

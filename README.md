@@ -67,7 +67,7 @@ Vercel serves the Vite frontend, but it does not run this app's long-lived Expre
 
 In the Vercel project settings, set `VITE_API_URL` to the API host's HTTPS origin (for example, `https://your-api-host.example.com`) for Production, then redeploy. This value is public and must not contain secrets. The frontend uses the Vite dev-server proxy locally when `VITE_API_URL` is unset.
 
-Vercel's build configuration is in `vercel.json`. The API health check is `GET /api/health`. Configure `CHAPA_SECRET_KEY` only on the API host if hosted checkout is needed.
+Vercel's build configuration is in `vercel.json`. The API health check is `GET /api/health`. Without a reachable API, the storefront and catalog pages display demo products, but account, cart, and checkout features require the API. Configure `CHAPA_SECRET_KEY` only on the API host if hosted checkout is needed.
 
 ## API
 
