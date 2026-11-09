@@ -33,6 +33,7 @@ export function ProductDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [previewCatalog, setPreviewCatalog] = useState(import.meta.env.VITE_CATALOG_MODE !== 'live');
+  const [cartAvailable, setCartAvailable] = useState(false);
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
@@ -57,6 +58,7 @@ export function ProductDetail() {
             }));
             setVariants(mockVars);
             setSelectedVariant(mockVars[0] || null);
+            setCartAvailable(false);
             setLoading(false);
             return;
           }
@@ -70,6 +72,7 @@ export function ProductDetail() {
             where: { productId: p.id }
           });
           setVariants(variantData);
+          setCartAvailable(variantData.length > 0);
           if (variantData.length > 0) {
             setSelectedVariant(variantData[0]);
           }
@@ -99,6 +102,7 @@ export function ProductDetail() {
             }];
           setVariants(productVariants);
           setSelectedVariant(productVariants[0]);
+          setCartAvailable(false);
         }
       } finally {
         setLoading(false);
@@ -356,10 +360,10 @@ export function ProductDetail() {
 
             <Button 
               className="w-full h-14 uppercase tracking-widest font-bold text-sm"
-              disabled={previewCatalog || !selectedVariant || selectedVariant.stock === 0}
+              disabled={!cartAvailable || !selectedVariant || selectedVariant.stock === 0}
               onClick={() => addItem(selectedVariant.id, 1)}
             >
-              {previewCatalog ? 'Cart unavailable in preview' : selectedVariant?.stock === 0 ? 'Out of Stock' : 'Add to Bag'}
+              {!cartAvailable ? 'Cart requires store connection' : selectedVariant?.stock === 0 ? 'Out of Stock' : previewCatalog ? 'Add to Preview Bag' : 'Add to Bag'}
             </Button>
           </div>
 

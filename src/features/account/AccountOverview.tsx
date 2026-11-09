@@ -53,7 +53,9 @@ export function AccountOverview() {
                   className="flex justify-between items-center text-xs hover:text-accent transition-colors"
                 >
                   <span>Order #{order.id.slice(-8)}</span>
-                  <Badge variant="secondary" className="text-[10px]">{order.status}</Badge>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {order.status === 'sandbox_complete' ? 'Sandbox demo' : order.status}
+                  </Badge>
                 </Link>
               ))}
               <Button variant="link" asChild className="px-0 text-accent h-auto text-xs">

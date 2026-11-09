@@ -110,6 +110,12 @@ export function OrderDetail() {
   if (!order) return <div className="py-20 text-center">Order not found</div>;
 
   const shippingAddress = order.shippingAddress ? JSON.parse(order.shippingAddress) : {};
+  const isSandboxOrder = order.status === 'sandbox_complete';
+  const demoPaymentLabel = {
+    telebirr: 'Telebirr (simulated)',
+    cbe_birr: 'CBE Birr (simulated)',
+    card: 'Credit/debit card (simulated)',
+  }[shippingAddress.demoChannel as 'telebirr' | 'cbe_birr' | 'card'];
 
   const getStatusStep = () => {
     const steps = ['pending', 'processing', 'shipped', 'delivered'];
@@ -141,14 +147,23 @@ export function OrderDetail() {
           order.status === 'delivered' && "bg-green-100 text-green-800",
           order.status === 'shipped' && "bg-blue-100 text-blue-800",
           order.status === 'processing' && "bg-orange-100 text-orange-800",
+          isSandboxOrder && "bg-violet-100 text-violet-800",
           order.status === 'cancelled' && "bg-red-100 text-red-800"
         )}>
-          {order.status}
+          {isSandboxOrder ? 'Sandbox demo' : order.status}
         </Badge>
       </div>
 
+      {isSandboxOrder && (
+        <p role="status" className="rounded-sm border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+          {shippingAddress.paymentMethod === 'demo'
+            ? `Demo checkout completed with ${demoPaymentLabel || 'a simulated payment option'}. This sample order is saved in your account for testing; no payment was taken and sample inventory was unchanged.`
+            : 'Chapa test payment verified for this demo only. No real payment was taken, no real order was placed, and sample stock was not changed.'}
+        </p>
+      )}
+
       {/* Order Status Timeline */}
-      {order.status !== 'cancelled' && (
+      {order.status !== 'cancelled' && !isSandboxOrder && (
         <div className="bg-secondary/30 p-6 rounded-sm">
           <div className="flex justify-between">
             {['Ordered', 'Processing', 'Shipped', 'Delivered'].map((step, idx) => (

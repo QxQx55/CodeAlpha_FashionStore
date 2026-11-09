@@ -26,6 +26,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -77,6 +87,9 @@ export function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [collections, setCollections] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -121,7 +134,7 @@ export function AdminProducts() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingProduct && !formData.collectionId) {
+    if (!formData.collectionId) {
       toast.error('Choose a product category before saving.');
       return;
     }
@@ -171,6 +184,26 @@ export function AdminProducts() {
     }
   };
 
+  const handleImageUpload = async (file?: File) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Product photos must be 5 MB or smaller.');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const { imageUrl } = await storeApi.api.uploadProductImage(file);
+      setFormData((previous) => ({ ...previous, imageUrl }));
+      toast.success('Product photo uploaded.');
+    } catch (error) {
+      console.error('Failed to upload product photo:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload product photo.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -208,12 +241,16 @@ export function AdminProducts() {
   };
 
   const handleDelete = async (id: string) => {
+    setDeleting(true);
     try {
       await (storeApi.db as any).products.delete(id);
-      toast.success('Product deleted');
-      fetchProducts();
+      await fetchProducts();
+      toast.success('Product deleted from the catalog.');
+      setProductToDelete(null);
     } catch (error) {
-      toast.error('Failed to delete product');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete product.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -222,9 +259,10 @@ export function AdminProducts() {
       await (storeApi.db as any).products.update(product.id, {
         active: product.active === "1" ? "0" : "1"
       });
-      fetchProducts();
+      await fetchProducts();
+      toast.success(product.active === "1" ? 'Product moved to drafts.' : 'Product published.');
     } catch (error) {
-      toast.error('Failed to update product');
+      toast.error(error instanceof Error ? error.message : 'Failed to update product.');
     }
   };
 
@@ -361,12 +399,35 @@ export function AdminProducts() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-widest">Image URL</Label>
+                <Label htmlFor="product-photo-file" className="text-xs uppercase tracking-widest">Upload product photo</Label>
+                <Input
+                  id="product-photo-file"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={uploadingImage || saving}
+                  onChange={(event) => {
+                    void handleImageUpload(event.target.files?.[0]);
+                    event.target.value = '';
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">Choose a JPEG, PNG, or WebP image up to 5 MB. It will be uploaded to the store server.</p>
+                <Label htmlFor="product-photo-url" className="text-xs uppercase tracking-widest">Or enter a photo URL</Label>
                 <Input 
+                  id="product-photo-url"
                   value={formData.imageUrl}
                   onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
-                  placeholder="https://..."
+                  placeholder="https://... or /images/products/example.jpg"
                 />
+                {formData.imageUrl.trim() && (
+                  <img
+                    src={formData.imageUrl}
+                    alt={`${formData.name || 'Product'} preview`}
+                    className="h-32 w-24 rounded-sm border object-cover"
+                    onError={(event) => {
+                      event.currentTarget.src = '/images/products/men-model.jpg';
+                    }}
+                  />
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -391,8 +452,8 @@ export function AdminProducts() {
                 />
                 <Label className="text-xs">Active (visible on storefront)</Label>
               </div>
-              <Button type="submit" className="w-full" disabled={saving}>
-                {saving ? 'Saving...' : editingProduct ? 'Update Product' : 'Save and Publish Product'}
+              <Button type="submit" className="w-full" disabled={saving || uploadingImage}>
+                {uploadingImage ? 'Uploading photo...' : saving ? 'Saving...' : editingProduct ? 'Update Product' : 'Save and Publish Product'}
               </Button>
             </form>
           </DialogContent>
@@ -488,7 +549,7 @@ export function AdminProducts() {
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           className="text-destructive"
-                          onClick={() => handleDelete(product.id)}
+                            onClick={() => setProductToDelete(product)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
@@ -501,6 +562,34 @@ export function AdminProducts() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog
+        open={Boolean(productToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setProductToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete product?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {productToDelete?.name} and its variants will be removed from the catalog. Products with order history cannot be deleted; deactivate those instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(event) => {
+                event.preventDefault();
+                if (productToDelete) void handleDelete(productToDelete.id);
+              }}
+            >
+              {deleting ? 'Deleting...' : 'Delete Product'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

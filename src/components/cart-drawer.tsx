@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCart } from './cart-provider';
 import { X, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,10 +6,20 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate } from 'react-router-dom';
+import { storeApi } from '@/lib/store-api';
+
+const previewCatalog = import.meta.env.VITE_CATALOG_MODE !== 'live';
 
 export function CartDrawer() {
   const { items, totalCount, subtotal, removeItem, updateQuantity, isOpen, setIsOpen } = useCart();
   const navigate = useNavigate();
+  const [demoCheckoutAvailable, setDemoCheckoutAvailable] = useState(false);
+
+  useEffect(() => {
+    storeApi.api.getChapaStatus()
+      .then(({ demoCheckoutAvailable }) => setDemoCheckoutAvailable(demoCheckoutAvailable))
+      .catch((error) => console.error('Failed to check preview checkout availability:', error));
+  }, []);
 
   const handleCheckout = () => {
     setIsOpen(false);
@@ -97,6 +107,11 @@ export function CartDrawer() {
 
             <SheetFooter className="p-6 bg-secondary/50 border-t sm:flex-col space-y-4">
               <div className="w-full space-y-2">
+                {previewCatalog && (
+                  <p role="status" className="text-center text-xs text-amber-800">
+                    Preview checkout saves a sample order in your account for testing. No payment is taken, and sample inventory is unchanged.
+                  </p>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-semibold">{subtotal.toLocaleString()} ETB</span>
@@ -105,8 +120,14 @@ export function CartDrawer() {
                   Shipping and taxes calculated at checkout.
                 </p>
               </div>
-              <Button className="w-full py-6 uppercase tracking-widest font-bold text-xs" onClick={handleCheckout}>
-                Checkout
+              <Button
+                className="w-full py-6 uppercase tracking-widest font-bold text-xs"
+                onClick={handleCheckout}
+                disabled={previewCatalog && !demoCheckoutAvailable}
+              >
+                {previewCatalog
+                  ? demoCheckoutAvailable ? 'Complete demo checkout' : 'Demo checkout unavailable'
+                  : 'Checkout'}
               </Button>
             </SheetFooter>
           </>

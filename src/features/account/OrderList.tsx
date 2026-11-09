@@ -47,6 +47,8 @@ export function OrderList() {
         return <Truck className="h-4 w-4 text-blue-600" />;
       case 'processing':
         return <Clock className="h-4 w-4 text-orange-600" />;
+      case 'sandbox_complete':
+        return <Check className="h-4 w-4 text-violet-600" />;
       case 'cancelled':
         return <X className="h-4 w-4 text-red-600" />;
       default:
@@ -82,7 +84,9 @@ export function OrderList() {
               </div>
               <div className="text-right space-y-1">
                 <p className="text-xs font-bold">{Number(order.totalAmount).toLocaleString()} ETB</p>
-                <Badge variant="secondary" className="text-[10px] uppercase">{order.status}</Badge>
+                <Badge variant="secondary" className="text-[10px] uppercase">
+                  {order.status === 'sandbox_complete' ? 'Sandbox demo' : order.status}
+                </Badge>
               </div>
             </Link>
           ))}

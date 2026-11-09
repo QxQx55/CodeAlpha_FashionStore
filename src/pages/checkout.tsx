@@ -32,14 +32,25 @@ const initialAddress: ShippingAddress = {
   phone: '',
 };
 
+const previewCatalog = import.meta.env.VITE_CATALOG_MODE !== 'live';
+const demoPaymentOptions = [
+  { id: 'telebirr', label: 'Telebirr (simulated)' },
+  { id: 'cbe_birr', label: 'CBE Birr (simulated)' },
+  { id: 'card', label: 'Credit/debit card (simulated)' },
+] as const;
+
 export function Checkout() {
   const { items, subtotal, clearCart, isLoading: isCartLoading } = useCart();
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<ShippingAddress>(initialAddress);
-  const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'chapa'>('cash_on_delivery');
+  const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'chapa' | 'demo'>(
+    previewCatalog ? 'demo' : 'cash_on_delivery',
+  );
+  const [demoChannel, setDemoChannel] = useState<'telebirr' | 'cbe_birr' | 'card'>('telebirr');
   const [chapaAvailable, setChapaAvailable] = useState(false);
+  const [demoCheckoutAvailable, setDemoCheckoutAvailable] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -54,8 +65,14 @@ export function Checkout() {
 
   useEffect(() => {
     storeApi.api.getChapaStatus()
-      .then(({ available }) => setChapaAvailable(available))
-      .catch((error) => console.error('Failed to check Chapa availability:', error));
+      .then(({ available, demoCheckoutAvailable: demoAvailable }) => {
+        setChapaAvailable(available);
+        setDemoCheckoutAvailable(demoAvailable);
+        if (previewCatalog && demoAvailable) setPaymentMethod('demo');
+      })
+      .catch((error) => {
+        console.error('Failed to check demo checkout availability:', error);
+      });
   }, []);
 
   const shippingCost = subtotal > 5000 ? 0 : 250;
@@ -85,13 +102,19 @@ export function Checkout() {
 
     setLoading(true);
     try {
-      const order = await storeApi.api.createOrder(formData, paymentMethod);
+      const order = await storeApi.api.createOrder(
+        formData,
+        paymentMethod,
+        paymentMethod === 'demo' ? demoChannel : undefined,
+      );
       if ('paymentUrl' in order) {
         window.location.assign(order.paymentUrl);
         return;
       }
       await clearCart();
-      toast.success('Order placed successfully!');
+      toast.success(paymentMethod === 'demo'
+        ? 'Demo checkout completed. No payment was taken.'
+        : 'Order placed successfully!');
       navigate(`/account/orders/${order.id}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to place the order.');
@@ -102,6 +125,18 @@ export function Checkout() {
   };
 
   if (isLoading || isCartLoading) return <div className="py-40 text-center animate-pulse">Loading...</div>;
+
+  if (previewCatalog && !demoCheckoutAvailable) {
+    return (
+      <div className="container mx-auto space-y-6 px-4 py-40 text-center">
+        <h1 className="font-serif text-3xl font-bold uppercase">Demo checkout is unavailable</h1>
+        <p className="text-muted-foreground">The demo checkout service is unavailable. Your sample cart is unchanged; no payment or order was made.</p>
+        <Button asChild>
+          <Link to="/collections/all">Continue Shopping</Link>
+        </Button>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -205,49 +240,79 @@ export function Checkout() {
                 </span>
                 <h2 className="text-sm font-bold uppercase tracking-widest">Payment</h2>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className={`flex cursor-pointer items-start gap-3 rounded-sm border p-4 transition-colors ${paymentMethod === 'cash_on_delivery' ? 'border-accent bg-accent/5' : 'border-border'}`}>
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="cash_on_delivery"
-                    checked={paymentMethod === 'cash_on_delivery'}
-                    onChange={() => setPaymentMethod('cash_on_delivery')}
-                    className="mt-1 accent-[#b38b38]"
-                  />
-                  <Banknote className="mt-0.5 h-5 w-5 shrink-0" />
-                  <span className="space-y-1">
-                    <span className="block text-sm font-medium">Cash on delivery</span>
-                    <span className="block text-xs text-muted-foreground">Pay when your order arrives.</span>
-                  </span>
-                </label>
-                <label className={`flex items-start gap-3 rounded-sm border p-4 transition-colors ${chapaAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${paymentMethod === 'chapa' ? 'border-accent bg-accent/5' : 'border-border'}`}>
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="chapa"
-                    checked={paymentMethod === 'chapa'}
-                    onChange={() => setPaymentMethod('chapa')}
-                    disabled={!chapaAvailable}
-                    className="mt-1 accent-[#b38b38]"
-                  />
-                  <CreditCard className="mt-0.5 h-5 w-5 shrink-0" />
-                  <span className="space-y-1">
-                    <span className="block text-sm font-medium">Pay securely with Chapa</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {chapaAvailable
-                        ? 'Continue to Chapa’s hosted payment page.'
-                        : 'Add CHAPA_SECRET_KEY to the API server to enable online payments.'}
-                    </span>
-                  </span>
-                </label>
-              </div>
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-green-600" />
-                {paymentMethod === 'chapa'
-                  ? 'Payment details are entered on Chapa and are never stored by this store.'
-                  : 'Your card details are never requested or stored by this store.'}
-              </p>
+              {previewCatalog ? (
+                <>
+                  <p className="text-sm text-muted-foreground">Choose a simulated payment option to complete the demo checkout. These options do not contact Telebirr, CBE Birr, or a card provider.</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {demoPaymentOptions.map((option) => (
+                      <label
+                        key={option.id}
+                        className={`flex cursor-pointer items-center gap-3 rounded-sm border p-4 transition-colors ${demoChannel === option.id ? 'border-accent bg-accent/5' : 'border-border'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="demoChannel"
+                          value={option.id}
+                          checked={demoChannel === option.id}
+                          onChange={() => setDemoChannel(option.id)}
+                          className="accent-[#b38b38]"
+                        />
+                        <span className="text-sm font-medium">{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <ShieldCheck className="h-4 w-4 text-green-600" />
+                    Demo only: a sample order will appear in your account for testing. No payment is taken, and sample inventory is unchanged.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-sm border p-4 transition-colors ${paymentMethod === 'cash_on_delivery' ? 'border-accent bg-accent/5' : 'border-border'}`}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="cash_on_delivery"
+                        checked={paymentMethod === 'cash_on_delivery'}
+                        onChange={() => setPaymentMethod('cash_on_delivery')}
+                        className="mt-1 accent-[#b38b38]"
+                      />
+                      <Banknote className="mt-0.5 h-5 w-5 shrink-0" />
+                      <span className="space-y-1">
+                        <span className="block text-sm font-medium">Cash on delivery</span>
+                        <span className="block text-xs text-muted-foreground">Pay when your order arrives.</span>
+                      </span>
+                    </label>
+                    <label className={`flex items-start gap-3 rounded-sm border p-4 transition-colors ${chapaAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${paymentMethod === 'chapa' ? 'border-accent bg-accent/5' : 'border-border'}`}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="chapa"
+                        checked={paymentMethod === 'chapa'}
+                        onChange={() => setPaymentMethod('chapa')}
+                        disabled={!chapaAvailable}
+                        className="mt-1 accent-[#b38b38]"
+                      />
+                      <CreditCard className="mt-0.5 h-5 w-5 shrink-0" />
+                      <span className="space-y-1">
+                        <span className="block text-sm font-medium">Pay securely with Chapa</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {chapaAvailable
+                            ? 'Continue to Chapa hosted checkout. Available methods depend on your merchant account.'
+                            : 'Add the appropriate CHAPA_SECRET_KEY to the API server to enable online payments.'}
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <ShieldCheck className="h-4 w-4 text-green-600" />
+                    {paymentMethod === 'chapa'
+                      ? 'Payment details are entered on Chapa and are never stored by this store.'
+                      : 'Your card details are never requested or stored by this store.'}
+                  </p>
+                </>
+              )}
             </section>
 
             <Button
@@ -255,7 +320,9 @@ export function Checkout() {
               className="h-14 w-full text-sm font-bold uppercase tracking-widest"
               disabled={loading || !isContactValid || !isShippingValid}
             >
-              {loading ? 'Processing...' : `${paymentMethod === 'chapa' ? 'Continue to Chapa' : 'Place order'} · ${total.toLocaleString()} ETB`}
+              {loading
+                ? 'Processing...'
+                : `${paymentMethod === 'demo' ? 'Complete demo checkout' : paymentMethod === 'chapa' ? 'Continue to Chapa' : 'Place order'} · ${total.toLocaleString()} ETB`}
             </Button>
           </form>
         </div>

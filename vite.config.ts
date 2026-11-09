@@ -16,6 +16,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': 'http://localhost:4000',
+      '/uploads/products': 'http://localhost:4000',
     },
   }
 });
