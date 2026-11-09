@@ -51,7 +51,12 @@ export async function apiRequest<T = any>(path: string, options: RequestInit = {
   }
 
   if (response.status === 204) return undefined as T;
-  const data = await response.json().catch(() => ({}));
+  if (!response.headers.get('content-type')?.toLowerCase().includes('json')) {
+    throw new Error(response.ok
+      ? 'The store API returned a webpage instead of data. Check the Vercel API URL configuration.'
+      : `The store API is unavailable (HTTP ${response.status}). Check the API deployment.`);
+  }
+  const data = await response.json();
   if (!response.ok) {
     const error = new Error(data.error || 'The request could not be completed.') as Error & { status?: number };
     error.status = response.status;
@@ -80,7 +85,10 @@ const db = Object.fromEntries(resourceNames.map((resource) => [
       if (limit) params.set('limit', String(limit));
       if (orderBy) params.set('orderBy', JSON.stringify(orderBy));
       const query = params.size ? `?${params}` : '';
-      return apiRequest<any[]>(`/api/${resource}${query}`);
+      return apiRequest<unknown>(`/api/${resource}${query}`).then((data) => {
+        if (!Array.isArray(data)) throw new Error(`The store API returned an invalid ${resource} list.`);
+        return data;
+      });
     },
     create: (input: Record<string, unknown>) => apiRequest<any>(`/api/${resource}`, {
       method: 'POST',

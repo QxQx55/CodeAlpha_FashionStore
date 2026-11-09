@@ -33,6 +33,7 @@ const categoryFallbackImages: Record<string, string> = {
 export function Home() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -81,6 +82,9 @@ export function Home() {
         if (active) setProducts(enrichedProducts);
       } catch (error) {
         console.error('Failed to load storefront content:', error);
+        if (active) {
+          setLoadError(error instanceof Error ? error.message : 'The store catalog is temporarily unavailable.');
+        }
       }
     };
 
@@ -165,6 +169,12 @@ export function Home() {
         </div>
       </section>
 
+      {loadError && (
+        <p role="status" className="container mx-auto max-w-[1050px] px-3 py-3 text-center text-sm text-red-700 sm:px-5">
+          Store catalog unavailable: {loadError}
+        </p>
+      )}
+
       <section aria-label="Featured categories" className="container mx-auto max-w-[1050px] px-3 sm:px-5">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4">
           {categoryCards.map((collection, index) => (
@@ -192,7 +202,7 @@ export function Home() {
               />
             </Link>
           ))}
-          {categoryCards.length === 0 && [1, 2, 3].map((item) => (
+          {categoryCards.length === 0 && !loadError && [1, 2, 3].map((item) => (
             <div key={item} className="h-[150px] animate-pulse bg-[#f2eeeb] sm:h-[165px]" />
           ))}
         </div>
@@ -213,7 +223,7 @@ export function Home() {
         <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4">
           {products.length > 0 ? products.slice(0, 8).map((product) => (
             <ProductCard key={product.id} product={product} />
-          )) : [1, 2, 3, 4].map((item) => (
+          )) : !loadError && [1, 2, 3, 4].map((item) => (
             <div key={item} className="animate-pulse space-y-3">
               <div className="aspect-[4/5] bg-[#f2eeeb]" />
               <div className="h-4 w-3/4 bg-[#f2eeeb]" />
