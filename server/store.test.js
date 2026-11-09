@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -6,6 +7,7 @@ import { after, before, test } from 'node:test';
 
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wende-store-test-'));
 process.env.DB_PATH = path.join(temporaryDirectory, 'store.sqlite');
+process.env.PRODUCT_UPLOAD_DIR = path.join(temporaryDirectory, 'product-uploads');
 process.env.JWT_SECRET = 'test-secret';
 process.env.ADMIN_EMAIL = 'admin@example.com';
 process.env.CORS_ORIGINS = 'https://www.codealpha.tech,https://codealpha.tech,https://code-alpha-fashion-store-zuw8.vercel.app,https://code-alpha-fashion-store.vercel.app';
@@ -89,6 +91,17 @@ test('registers customers and places orders using current database prices and st
   });
   assert.equal(previewCheckout.response.status, 503);
   assert.match(previewCheckout.body.error, /preview inventory/);
+  const previewCartItem = await request('/api/cartItems', {
+    token,
+    method: 'POST',
+    body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 1 }),
+  });
+  assert.equal(previewCartItem.response.status, 201);
+  const removePreviewItem = await request(`/api/cartItems/${previewCartItem.body.id}`, {
+    token,
+    method: 'DELETE',
+  });
+  assert.equal(removePreviewItem.response.status, 204);
   process.env.STORE_MODE = 'live';
 
   const excessiveCartItem = await request('/api/cartItems', {
@@ -171,6 +184,39 @@ test('registers customers and places orders using current database prices and st
   });
   assert.equal(adminRegistration.body.user.isAdmin, true);
 
+  const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0y8AAAAASUVORK5CYII=', 'base64');
+  const unauthorizedUpload = await fetch(`${baseUrl}/api/admin/product-images`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'image/png' },
+    body: imageBytes,
+  });
+  assert.equal(unauthorizedUpload.status, 401);
+
+  const invalidImageUpload = await fetch(`${baseUrl}/api/admin/product-images`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${adminRegistration.body.token}`,
+      'Content-Type': 'image/png',
+    },
+    body: Buffer.from('not an image'),
+  });
+  assert.equal(invalidImageUpload.status, 400);
+
+  const imageUpload = await fetch(`${baseUrl}/api/admin/product-images`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${adminRegistration.body.token}`,
+      'Content-Type': 'image/png',
+    },
+    body: imageBytes,
+  });
+  assert.equal(imageUpload.status, 201);
+  const uploadedImage = await imageUpload.json();
+  assert.match(uploadedImage.imageUrl, new RegExp(`^${baseUrl}/uploads/products/[0-9a-f-]+\\.png$`));
+  const imageResponse = await fetch(uploadedImage.imageUrl);
+  assert.equal(imageResponse.status, 200);
+  assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()), imageBytes);
+
   const product = await request('/api/products', {
     method: 'POST',
     token: adminRegistration.body.token,
@@ -181,7 +227,7 @@ test('registers customers and places orders using current database prices and st
       collectionId: 'coll_women',
       gender: 'women',
       basePrice: 2300,
-      imageUrl: 'https://example.com/product.jpg',
+      imageUrl: uploadedImage.imageUrl,
       active: '1',
       initialStock: 7,
       sizes: ['S', 'M', 'L'],
@@ -207,6 +253,44 @@ test('registers customers and places orders using current database prices and st
   assert.equal(updatedProduct.body.basePrice, 2500);
   const updatedVariants = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ productId: product.body.id }))}`)).body;
   assert.ok(updatedVariants.every((variant) => variant.price === 2500 && variant.stock === 7));
+  assert.ok(updatedVariants.every((variant) => variant.imageUrls === JSON.stringify([uploadedImage.imageUrl])));
+
+  const updatedPhoto = await request(`/api/products/${product.body.id}`, {
+    method: 'PUT',
+    token: adminRegistration.body.token,
+    body: JSON.stringify({ imageUrl: 'https://example.com/updated-product.jpg' }),
+  });
+  assert.equal(updatedPhoto.response.status, 200);
+  assert.equal(updatedPhoto.body.imageUrl, 'https://example.com/updated-product.jpg');
+  const variantsWithUpdatedPhoto = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ productId: product.body.id }))}`)).body;
+  assert.ok(variantsWithUpdatedPhoto.every((variant) => variant.imageUrls === JSON.stringify(['https://example.com/updated-product.jpg'])));
+
+  const orderId = randomUUID();
+  db.prepare(`
+    INSERT INTO orders (id, userId, totalAmount, status, shippingAddress, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(orderId, adminRegistration.body.user.id, 100, 'processing', '{}', new Date().toISOString());
+  db.prepare(`
+    INSERT INTO orderItems (id, orderId, variantId, quantity, price)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(randomUUID(), orderId, variantsWithUpdatedPhoto[0].id, 1, 100);
+  const deleteOrderedProduct = await request(`/api/products/${product.body.id}`, {
+    token: adminRegistration.body.token,
+    method: 'DELETE',
+  });
+  assert.equal(deleteOrderedProduct.response.status, 409);
+  assert.match(deleteOrderedProduct.body.error, /order history/);
+  db.prepare('DELETE FROM orders WHERE id = ?').run(orderId);
+
+  const deleteProduct = await request(`/api/products/${product.body.id}`, {
+    token: adminRegistration.body.token,
+    method: 'DELETE',
+  });
+  assert.equal(deleteProduct.response.status, 204);
+  const deletedVariants = await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ productId: product.body.id }))}`);
+  assert.deepEqual(deletedVariants.body, []);
+  const deletedProduct = await request(`/api/products?where=${encodeURIComponent(JSON.stringify({ id: product.body.id }))}`);
+  assert.deepEqual(deletedProduct.body, []);
 
   const invalidProduct = await request('/api/products', {
     method: 'POST',
@@ -219,8 +303,6 @@ test('registers customers and places orders using current database prices and st
   });
   assert.equal(invalidProduct.response.status, 400);
 
-  db.prepare('DELETE FROM productVariants WHERE productId = ?').run(product.body.id);
-  db.prepare('DELETE FROM products WHERE id = ?').run(product.body.id);
 });
 
 test('sets security headers and limits repeated sign-in attempts', async () => {
@@ -307,13 +389,98 @@ test('seeds at least ten category-matched products into every active category', 
   assert.equal(new Set(names).size, names.length, 'product names must be unique');
 });
 
+test('completes no-charge demo checkout without a payment provider and preserves sample inventory', async () => {
+  const originalSecret = process.env.CHAPA_SECRET_KEY;
+  const originalStoreMode = process.env.STORE_MODE;
+  delete process.env.CHAPA_SECRET_KEY;
+  process.env.STORE_MODE = 'preview';
+
+  try {
+    const registration = await request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'demo-shopper@example.com', password: 'secure-password-4', displayName: 'Demo Shopper' }),
+    });
+    assert.equal(registration.response.status, 201);
+    const { token } = registration.body;
+    const status = await request('/api/payments/chapa/status');
+    assert.equal(status.body.demoCheckoutAvailable, true);
+
+    process.env.STORE_MODE = 'live';
+    const liveDemoCheckout = await request('/api/checkout', {
+      token,
+      method: 'POST',
+      body: JSON.stringify({ paymentMethod: 'demo' }),
+    });
+    assert.equal(liveDemoCheckout.response.status, 503);
+    assert.match(liveDemoCheckout.body.error, /only available while the store is in preview mode/);
+    process.env.STORE_MODE = 'preview';
+
+    const shippingAddress = {
+      email: 'demo-shopper@example.com',
+      firstName: 'Demo',
+      lastName: 'Shopper',
+      address: '1 Market Street',
+      city: 'Addis Ababa',
+      postalCode: '1000',
+      phone: '+251 911 234 567',
+    };
+    const invalidChannel = await request('/api/checkout', {
+      token,
+      method: 'POST',
+      body: JSON.stringify({ paymentMethod: 'demo', demoChannel: 'unknown', shippingAddress }),
+    });
+    assert.equal(invalidChannel.response.status, 400);
+    assert.match(invalidChannel.body.error, /valid simulated payment option/);
+
+    const variantId = 'variant_demo_men_1_s';
+    const variantBefore = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantId }))}`)).body[0];
+    assert.ok(variantBefore.stock > 0);
+    const cartItem = await request('/api/cartItems', {
+      token,
+      method: 'POST',
+      body: JSON.stringify({ variantId, quantity: 2 }),
+    });
+    assert.equal(cartItem.response.status, 201);
+
+    const checkout = await request('/api/checkout', {
+      token,
+      method: 'POST',
+      body: JSON.stringify({ paymentMethod: 'demo', demoChannel: 'telebirr', shippingAddress }),
+    });
+    assert.equal(checkout.response.status, 201);
+    assert.equal(checkout.body.status, 'sandbox_complete');
+    const orderDetails = JSON.parse(checkout.body.shippingAddress);
+    assert.equal(orderDetails.paymentMethod, 'demo');
+    assert.equal(orderDetails.demoChannel, 'telebirr');
+    assert.equal(orderDetails.sandbox, true);
+
+    const orderItems = await request(`/api/orderItems?where=${encodeURIComponent(JSON.stringify({ orderId: checkout.body.id }))}`, { token });
+    assert.equal(orderItems.response.status, 200);
+    assert.equal(orderItems.body.length, 1);
+    assert.equal(orderItems.body[0].variantId, variantId);
+    assert.equal(orderItems.body[0].quantity, 2);
+
+    const cartAfterCheckout = await request('/api/cartItems', { token });
+    assert.deepEqual(cartAfterCheckout.body, []);
+    const variantAfter = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantId }))}`)).body[0];
+    assert.equal(variantAfter.stock, variantBefore.stock);
+  } finally {
+    if (originalSecret === undefined) delete process.env.CHAPA_SECRET_KEY;
+    else process.env.CHAPA_SECRET_KEY = originalSecret;
+    if (originalStoreMode === undefined) delete process.env.STORE_MODE;
+    else process.env.STORE_MODE = originalStoreMode;
+  }
+});
+
 test('initializes Chapa checkout and only processes an order after verifying payment', async () => {
   const originalFetch = globalThis.fetch;
   const originalSecret = process.env.CHAPA_SECRET_KEY;
   const originalAppUrl = process.env.PUBLIC_APP_URL;
+  const originalStoreMode = process.env.STORE_MODE;
   const providerCalls = [];
   process.env.CHAPA_SECRET_KEY = 'CHASECK_TEST_example';
   process.env.PUBLIC_APP_URL = 'http://localhost:3000';
+  process.env.STORE_MODE = 'live';
 
   globalThis.fetch = async (input, options) => {
     if (String(input).startsWith(baseUrl)) return originalFetch(input, options);
@@ -340,6 +507,30 @@ test('initializes Chapa checkout and only processes an order after verifying pay
     });
     assert.equal(registration.response.status, 201);
     const token = registration.body.token;
+    const liveTestKeyCheckout = await request('/api/checkout', {
+      token,
+      method: 'POST',
+      body: JSON.stringify({ paymentMethod: 'chapa' }),
+    });
+    assert.equal(liveTestKeyCheckout.response.status, 503);
+    assert.match(liveTestKeyCheckout.body.error, /test key cannot be used for live checkout/);
+
+    process.env.STORE_MODE = 'preview';
+    const chapaStatus = await request('/api/payments/chapa/status');
+    assert.deepEqual(chapaStatus.body, {
+      available: true,
+      sandbox: true,
+      checkoutAvailable: true,
+      demoCheckoutAvailable: true,
+    });
+    const previewCashOnDelivery = await request('/api/checkout', {
+      token,
+      method: 'POST',
+      body: JSON.stringify({ paymentMethod: 'cash_on_delivery' }),
+    });
+    assert.equal(previewCashOnDelivery.response.status, 503);
+    assert.match(previewCashOnDelivery.body.error, /preview inventory/);
+
     const variantBefore = (await request('/api/productVariants?where=%7B%22id%22%3A%22variant_demo_men_1_s%22%7D')).body[0];
     assert.ok(variantBefore.stock > 0);
 
@@ -376,26 +567,32 @@ test('initializes Chapa checkout and only processes an order after verifying pay
     const pendingOrder = (await request(`/api/orders?where=${encodeURIComponent(JSON.stringify({ id: checkout.body.orderId }))}`, { token })).body[0];
     assert.equal(pendingOrder.status, 'pending');
     assert.equal(JSON.parse(pendingOrder.shippingAddress).paymentMethod, 'chapa');
+    assert.equal(JSON.parse(pendingOrder.shippingAddress).sandbox, true);
     const stockBeforeVerification = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantBefore.id }))}`)).body[0].stock;
     assert.equal(stockBeforeVerification, variantBefore.stock);
 
+    process.env.STORE_MODE = 'live';
     const verification = await request(`/api/payments/chapa/verify/${checkout.body.txRef}`, { token });
     assert.equal(verification.response.status, 200);
-    assert.equal(verification.body.status, 'processing');
+    assert.equal(verification.body.status, 'sandbox_complete');
     const variantAfterVerification = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantBefore.id }))}`)).body[0];
-    assert.equal(variantAfterVerification.stock, variantBefore.stock - 2);
+    assert.equal(variantAfterVerification.stock, variantBefore.stock);
     const cartAfterVerification = await request('/api/cartItems', { token });
     assert.deepEqual(cartAfterVerification.body, []);
 
+    process.env.STORE_MODE = 'preview';
     const repeatedVerification = await request(`/api/payments/chapa/verify/${checkout.body.txRef}`, { token });
     assert.equal(repeatedVerification.response.status, 200);
+    assert.equal(repeatedVerification.body.status, 'sandbox_complete');
     assert.equal(providerCalls.length, 2, 'a completed order should not be verified or charged twice');
-    assert.equal((await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantBefore.id }))}`)).body[0].stock, variantBefore.stock - 2);
+    assert.equal((await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantBefore.id }))}`)).body[0].stock, variantBefore.stock);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalSecret === undefined) delete process.env.CHAPA_SECRET_KEY;
     else process.env.CHAPA_SECRET_KEY = originalSecret;
     if (originalAppUrl === undefined) delete process.env.PUBLIC_APP_URL;
     else process.env.PUBLIC_APP_URL = originalAppUrl;
+    if (originalStoreMode === undefined) delete process.env.STORE_MODE;
+    else process.env.STORE_MODE = originalStoreMode;
   }
 });

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -6,8 +7,20 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db, resources } from './store.js';
 
+function isChapaTestKey() {
+  return /^CHASECK_TEST[-_]/i.test(String(process.env.CHAPA_SECRET_KEY || ''));
+}
+
 const appDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectDirectory = path.resolve(appDirectory, '..');
+const dataDirectory = path.dirname(path.resolve(process.env.DB_PATH || path.join(projectDirectory, 'data', 'store.sqlite')));
+const productUploadDirectory = path.resolve(process.env.PRODUCT_UPLOAD_DIR || path.join(dataDirectory, 'product-uploads'));
+const uploadTypes = new Map([
+  ['image/jpeg', { extension: '.jpg', signature: (buffer) => buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff }],
+  ['image/png', { extension: '.png', signature: (buffer) => buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) }],
+  ['image/webp', { extension: '.webp', signature: (buffer) => buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP' }],
+]);
+fs.mkdirSync(productUploadDirectory, { recursive: true });
 const jwtSecret = process.env.JWT_SECRET || 'development-secret-change-before-deploy';
 const privateResources = new Set(['cartItems', 'wishlist', 'orders', 'orderItems', 'returns']);
 const publicResources = new Set(['collections', 'products', 'productVariants']);
@@ -131,19 +144,29 @@ function validateChapaPayment(order, providerResponse) {
   const finalizeOrder = db.transaction(() => {
     const currentOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
     if (!currentOrder) throw new HttpError(404, 'Order not found.');
-    if (currentOrder.status === 'processing') return currentOrder;
+    if (currentOrder.status === 'processing' || currentOrder.status === 'sandbox_complete') return currentOrder;
     if (currentOrder.status !== 'pending') throw new HttpError(409, 'This order is no longer awaiting payment.');
 
     const items = db.prepare('SELECT variantId, quantity FROM orderItems WHERE orderId = ?').all(order.id);
-    const updateStock = db.prepare('UPDATE productVariants SET stock = stock - ? WHERE id = ? AND stock >= ?');
-    for (const item of items) {
-      const result = updateStock.run(item.quantity, item.variantId, item.quantity);
-      if (result.changes !== 1) {
-        throw new HttpError(409, 'Payment succeeded, but an item is no longer available. Contact store support.');
+    let orderDetails;
+    try {
+      orderDetails = JSON.parse(currentOrder.shippingAddress);
+    } catch {
+      throw new HttpError(500, 'The saved order details are invalid.');
+    }
+    const sandboxOrder = orderDetails.sandbox === true;
+    if (!sandboxOrder) {
+      const updateStock = db.prepare('UPDATE productVariants SET stock = stock - ? WHERE id = ? AND stock >= ?');
+      for (const item of items) {
+        const result = updateStock.run(item.quantity, item.variantId, item.quantity);
+        if (result.changes !== 1) {
+          throw new HttpError(409, 'Payment succeeded, but an item is no longer available. Contact store support.');
+        }
       }
     }
 
-    db.prepare("UPDATE orders SET status = 'processing' WHERE id = ?").run(order.id);
+    db.prepare('UPDATE orders SET status = ? WHERE id = ?')
+      .run(sandboxOrder ? 'sandbox_complete' : 'processing', order.id);
     db.prepare(`
       DELETE FROM cartItems
       WHERE userId = ? AND variantId IN (SELECT variantId FROM orderItems WHERE orderId = ?)
@@ -156,6 +179,7 @@ function validateChapaPayment(order, providerResponse) {
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', 1);
   const allowedOrigins = new Set(
     String(process.env.CORS_ORIGINS || '')
       .split(',')
@@ -191,11 +215,41 @@ function createApp() {
     }
     next();
   });
+  app.post(
+    '/api/admin/product-images',
+    authenticate,
+    requireAdmin,
+    express.raw({ type: () => true, limit: '5mb' }),
+    async (req, res, next) => {
+      try {
+        const contentType = String(req.get('content-type') || '').split(';')[0].trim().toLowerCase();
+        const uploadType = uploadTypes.get(contentType);
+        if (!uploadType || !Buffer.isBuffer(req.body) || !uploadType.signature(req.body)) {
+          throw new HttpError(400, 'Upload a valid JPEG, PNG, or WebP image.');
+        }
+
+        const filename = `${crypto.randomUUID()}${uploadType.extension}`;
+        await fs.promises.writeFile(path.join(productUploadDirectory, filename), req.body, { flag: 'wx' });
+        const apiUrl = String(process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+        res.status(201).json({ imageUrl: `${apiUrl}/uploads/products/${filename}` });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.get('/api/payments/chapa/status', (_req, res) => {
-    res.json({ available: Boolean(process.env.CHAPA_SECRET_KEY) });
+    const previewMode = process.env.STORE_MODE !== 'live';
+    const testKey = isChapaTestKey();
+    const available = Boolean(process.env.CHAPA_SECRET_KEY) && (previewMode ? testKey : !testKey);
+    res.json({
+      available,
+      sandbox: previewMode && testKey,
+      checkoutAvailable: !previewMode || available,
+      demoCheckoutAvailable: previewMode,
+    });
   });
 
   app.post('/api/auth/register', createRateLimiter({ limit: 10, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
@@ -311,11 +365,21 @@ function createApp() {
 
   app.post('/api/checkout', authenticate, async (req, res, next) => {
     try {
-      if (process.env.STORE_MODE !== 'live') {
+      const paymentMethod = req.body?.paymentMethod;
+      const previewMode = process.env.STORE_MODE !== 'live';
+      if (paymentMethod === 'demo' && !previewMode) {
+        throw new HttpError(503, 'Demo checkout is only available while the store is in preview mode.');
+      }
+      if (previewMode && !['demo', 'chapa'].includes(paymentMethod)) {
         throw new HttpError(503, 'Checkout is disabled while the store is using preview inventory.');
       }
+      if (previewMode && paymentMethod === 'chapa' && !isChapaTestKey()) {
+        throw new HttpError(503, 'Chapa test payments are not configured. Use the no-charge demo checkout instead.');
+      }
+      if (!previewMode && paymentMethod === 'chapa' && isChapaTestKey()) {
+        throw new HttpError(503, 'A Chapa test key cannot be used for live checkout.');
+      }
       const address = req.body?.shippingAddress;
-      const paymentMethod = req.body?.paymentMethod;
       if (!address || typeof address !== 'object' || Array.isArray(address)) {
         throw new HttpError(400, 'Enter a valid shipping address.');
       }
@@ -332,8 +396,12 @@ function createApp() {
           throw new HttpError(400, `${field} is too long.`);
         }
       }
-      if (!['cash_on_delivery', 'chapa'].includes(paymentMethod)) {
+      if (!['cash_on_delivery', 'chapa', 'demo'].includes(paymentMethod)) {
         throw new HttpError(400, 'Choose a supported payment method.');
+      }
+      const demoChannel = String(req.body?.demoChannel || '');
+      if (paymentMethod === 'demo' && !['telebirr', 'cbe_birr', 'card'].includes(demoChannel)) {
+        throw new HttpError(400, 'Choose a valid simulated payment option.');
       }
       if (paymentMethod === 'chapa' && !process.env.CHAPA_SECRET_KEY) {
         throw new HttpError(503, 'Chapa payments are not configured. Set CHAPA_SECRET_KEY on the API server.');
@@ -383,7 +451,7 @@ function createApp() {
         id: orderId,
         userId: req.user.id,
         totalAmount,
-        status: paymentMethod === 'chapa' ? 'pending' : 'processing',
+        status: paymentMethod === 'demo' ? 'sandbox_complete' : paymentMethod === 'chapa' ? 'pending' : 'processing',
         shippingAddress: JSON.stringify({
           email: String(address.email).trim(),
           firstName: String(address.firstName).trim(),
@@ -394,6 +462,8 @@ function createApp() {
           country: String(address.country || 'Ethiopia').trim(),
           phone: String(address.phone || '').trim(),
           paymentMethod,
+          ...(paymentMethod === 'demo' ? { demoChannel } : {}),
+          sandbox: previewMode && ['demo', 'chapa'].includes(paymentMethod),
         }),
         createdAt: new Date().toISOString(),
       };
@@ -418,11 +488,13 @@ function createApp() {
             if (result.changes !== 1) throw new HttpError(409, 'A cart item has just sold out. Please review your cart.');
           }
           db.prepare('DELETE FROM cartItems WHERE userId = ?').run(req.user.id);
+        } else if (paymentMethod === 'demo') {
+          db.prepare('DELETE FROM cartItems WHERE userId = ?').run(req.user.id);
         }
       });
       createOrder();
 
-      if (paymentMethod === 'cash_on_delivery') {
+      if (paymentMethod === 'cash_on_delivery' || paymentMethod === 'demo') {
         return res.status(201).json(order);
       }
 
@@ -489,8 +561,20 @@ function createApp() {
       if (!/^[0-9a-f-]{36}$/i.test(txRef)) throw new HttpError(400, 'Invalid payment reference.');
       const order = db.prepare('SELECT * FROM orders WHERE id = ? AND userId = ?').get(txRef, req.user.id);
       if (!order) throw new HttpError(404, 'Order not found.');
-      if (order.status === 'processing') return res.json(order);
+      if (order.status === 'processing' || order.status === 'sandbox_complete') return res.json(order);
       if (order.status !== 'pending') throw new HttpError(409, 'This order is no longer awaiting payment.');
+      let orderDetails;
+      try {
+        orderDetails = JSON.parse(order.shippingAddress);
+      } catch {
+        throw new HttpError(500, 'The saved order details are invalid.');
+      }
+      if (orderDetails.sandbox === true && !isChapaTestKey()) {
+        throw new HttpError(503, 'A Chapa test key is required to verify this sandbox order.');
+      }
+      if (orderDetails.sandbox !== true && isChapaTestKey()) {
+        throw new HttpError(503, 'A Chapa test key cannot verify a live order.');
+      }
       if (!process.env.CHAPA_SECRET_KEY) {
         throw new HttpError(503, 'Chapa payments are not configured on the API server.');
       }
@@ -706,6 +790,15 @@ function createApp() {
                 WHERE productId = ? AND (price IS NULL OR price = ?)
               `).run(fields.basePrice, id, current.basePrice);
             }
+            if (resource === 'products' && fields.imageUrl !== undefined && fields.imageUrl !== current.imageUrl) {
+              const previousImages = JSON.stringify(current.imageUrl ? [current.imageUrl] : []);
+              const updatedImages = JSON.stringify(fields.imageUrl ? [fields.imageUrl] : []);
+              db.prepare(`
+                UPDATE productVariants
+                SET imageUrls = ?
+                WHERE productId = ? AND (imageUrls = ? OR imageUrls = '[]')
+              `).run(updatedImages, id, previousImages);
+            }
           });
           updateRecord();
           return res.json(db.prepare(`SELECT * FROM "${resource}" WHERE id = ?`).get(id));
@@ -741,6 +834,18 @@ function createApp() {
         } else {
           throw new HttpError(403, 'This record cannot be deleted.');
         }
+        if (resource === 'products') {
+          const orderedVariant = db.prepare(`
+            SELECT 1
+            FROM productVariants variants
+            JOIN orderItems items ON items.variantId = variants.id
+            WHERE variants.productId = ?
+            LIMIT 1
+          `).get(id);
+          if (orderedVariant) {
+            throw new HttpError(409, 'This product has order history and cannot be deleted. Deactivate it instead.');
+          }
+        }
         db.prepare(`DELETE FROM "${resource}" WHERE id = ?`).run(id);
         res.status(204).end();
       };
@@ -761,6 +866,12 @@ function createApp() {
   });
 
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'API endpoint not found.')));
+  app.use('/uploads/products', express.static(productUploadDirectory, {
+    dotfiles: 'deny',
+    index: false,
+    maxAge: '1y',
+    immutable: true,
+  }));
   app.use(express.static(path.join(projectDirectory, 'dist')));
   app.use((req, res, next) => {
     if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
@@ -770,6 +881,9 @@ function createApp() {
   });
 
   app.use((error, _req, res, _next) => {
+    if (error.type === 'entity.too.large') {
+      return res.status(413).json({ error: 'Product photos must be 5 MB or smaller.' });
+    }
     if (error instanceof SyntaxError && 'body' in error) {
       return res.status(400).json({ error: 'Request body must be valid JSON.' });
     }

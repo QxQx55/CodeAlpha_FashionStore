@@ -107,11 +107,25 @@ const db = Object.fromEntries(resourceNames.map((resource) => [
 export const storeApi = {
   db,
   api: {
-    createOrder: (shippingAddress: Record<string, string>, paymentMethod: 'cash_on_delivery' | 'chapa' = 'cash_on_delivery') => apiRequest<CheckoutResult>('/api/checkout', {
+    uploadProductImage: (file: File) => apiRequest<{ imageUrl: string }>('/api/admin/product-images', {
       method: 'POST',
-      body: JSON.stringify({ shippingAddress, paymentMethod }),
+      headers: { 'Content-Type': file.type },
+      body: file,
     }),
-    getChapaStatus: () => apiRequest<{ available: boolean }>('/api/payments/chapa/status'),
+    createOrder: (
+      shippingAddress: Record<string, string>,
+      paymentMethod: 'cash_on_delivery' | 'chapa' | 'demo' = 'cash_on_delivery',
+      demoChannel?: 'telebirr' | 'cbe_birr' | 'card',
+    ) => apiRequest<CheckoutResult>('/api/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ shippingAddress, paymentMethod, demoChannel }),
+    }),
+    getChapaStatus: () => apiRequest<{
+      available: boolean;
+      sandbox: boolean;
+      checkoutAvailable: boolean;
+      demoCheckoutAvailable: boolean;
+    }>('/api/payments/chapa/status'),
     verifyChapaPayment: (txRef: string) => apiRequest<StoreOrder>(`/api/payments/chapa/verify/${encodeURIComponent(txRef)}`),
   },
   auth: {
