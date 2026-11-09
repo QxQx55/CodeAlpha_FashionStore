@@ -437,7 +437,7 @@ export function AdminProducts() {
                   <TableCell>
                     <div className="h-12 w-12 bg-secondary overflow-hidden rounded-sm">
                       <img 
-                        src={product.imageUrl || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=100'}
+                        src={product.imageUrl || '/images/products/men-model.jpg'}
                         alt={product.name}
                         className="h-full w-full object-cover"
                       />

@@ -78,7 +78,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           quantity: item.quantity,
           product: {
             name: p.name,
-            image: images[0] || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop',
+            image: images[0] || '/images/products/men-model.jpg',
             basePrice: p.basePrice
           },
           variant: {

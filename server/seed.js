@@ -1,10 +1,71 @@
+const productImages = {
+  coll_men: ['/images/products/men-model.jpg', '/images/products/men-editorial.jpg', '/images/products/men-flatlay.jpg'],
+  coll_women: ['/images/products/women-dress-floral.jpg', '/images/products/women-dress-red.jpg', '/images/products/women-apparel-rack.jpg'],
+  coll_kids: ['/images/products/kids-model.jpg', '/images/products/kids-apparel-rack.jpg'],
+  coll_shoes: ['/images/products/shoes-derby.jpg', '/images/products/shoes-sneaker.jpg', '/images/products/shoes-fashion.jpg'],
+  coll_traditional: ['/images/products/ethiopian-traditional-man.jpg', '/images/products/ethiopian-traditional-woman.jpg', '/images/products/ethiopian-traditional-kids.jpg', '/images/products/ethiopian-garment-detail.jpg'],
+  coll_accessories: ['/images/products/accessories-flatlay.jpg', '/images/products/accessories-watch.jpg', '/images/products/accessories-bag.jpg'],
+  coll_outerwear: ['/images/products/outerwear-editorial.jpg', '/images/products/outerwear-coat.jpg', '/images/products/outerwear-jacket.jpg'],
+  coll_activewear: ['/images/products/activewear-training.jpg', '/images/products/activewear-leggings.jpg', '/images/products/activewear-runner.jpg'],
+};
+
+function getProductImage(collectionId, name, gender, index) {
+  if (collectionId === 'coll_traditional') {
+    if (gender === 'men') return productImages.coll_traditional[0];
+    if (gender === 'women') return productImages.coll_traditional[1];
+    if (gender === 'kids') return productImages.coll_traditional[2];
+    return productImages.coll_traditional[3];
+  }
+
+  const images = productImages[collectionId];
+  if (!images) throw new Error(`Missing product image mapping for ${collectionId}`);
+  const normalizedName = name.toLowerCase();
+
+  if (collectionId === 'coll_men') {
+    if (/pant|jean|chino|short/.test(normalizedName)) return productImages.coll_men[2];
+    if (/jacket|coat|overshirt/.test(normalizedName)) return productImages.coll_men[1];
+  } else if (collectionId === 'coll_shoes') {
+    if (/derby|loafer|boot|formal/.test(normalizedName)) return productImages.coll_shoes[0];
+    if (/sneaker|runner|trainer|canvas|running/.test(normalizedName)) return productImages.coll_shoes[1];
+  } else if (collectionId === 'coll_accessories') {
+    if (/watch|chronograph/.test(normalizedName)) return productImages.coll_accessories[1];
+    if (/bag|tote/.test(normalizedName)) return productImages.coll_accessories[2];
+  } else if (collectionId === 'coll_outerwear') {
+    if (/coat|overcoat/.test(normalizedName)) return productImages.coll_outerwear[1];
+    if (/jacket|raincoat/.test(normalizedName)) return productImages.coll_outerwear[2];
+  } else if (collectionId === 'coll_activewear') {
+    if (/legging|tight/.test(normalizedName)) return productImages.coll_activewear[1];
+    if (/run|short/.test(normalizedName)) return productImages.coll_activewear[2];
+  } else if (collectionId === 'coll_women') {
+    if (/rack/.test(normalizedName)) return productImages.coll_women[2];
+    if (/dress|skirt/.test(normalizedName)) return productImages.coll_women[0];
+  } else if (collectionId === 'coll_kids' && /dress|jacket|coat/.test(normalizedName)) {
+    return productImages.coll_kids[1];
+  }
+
+  return images[index % images.length];
+}
+
+export const legacyCollectionImageUrls = {
+  coll_men: 'https://images.unsplash.com/photo-1488161628813-24479dcbc2ef?q=80&w=1200&auto=format&fit=crop',
+  coll_women: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1200&auto=format&fit=crop',
+  coll_kids: 'https://images.unsplash.com/photo-1519234110450-1aa963672068?q=80&w=1200&auto=format&fit=crop',
+  coll_shoes: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=1200&auto=format&fit=crop',
+  coll_traditional: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=1200&auto=format&fit=crop',
+  coll_accessories: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1200&auto=format&fit=crop',
+  coll_outerwear: 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=1200&auto=format&fit=crop',
+  coll_activewear: 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=1200&auto=format&fit=crop',
+};
+
+export const legacyProductImageUrls = new Map();
+
 export const collections = [
   {
     id: 'coll_men',
     name: 'Men',
     slug: 'men',
     description: 'Modern essentials with thoughtful details.',
-    imageUrl: 'https://images.unsplash.com/photo-1488161628813-24479dcbc2ef?q=80&w=1200&auto=format&fit=crop',
+    imageUrl: '/images/products/men-model.jpg',
     active: '1',
   },
   {
@@ -12,7 +73,7 @@ export const collections = [
     name: 'Women',
     slug: 'women',
     description: 'Contemporary pieces made for everyday elegance.',
-    imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1200&auto=format&fit=crop',
+    imageUrl: '/images/products/women-dress-floral.jpg',
     active: '1',
   },
   {
@@ -20,7 +81,7 @@ export const collections = [
     name: 'Kids',
     slug: 'kids',
     description: 'Comfortable favorites for little ones.',
-    imageUrl: 'https://images.unsplash.com/photo-1519234110450-1aa963672068?q=80&w=1200&auto=format&fit=crop',
+    imageUrl: '/images/products/kids-model.jpg',
     active: '1',
   },
   {
@@ -28,7 +89,7 @@ export const collections = [
     name: 'Shoes',
     slug: 'shoes',
     description: 'Everyday footwear, crafted to last.',
-    imageUrl: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=1200&auto=format&fit=crop',
+    imageUrl: '/images/products/shoes-sneaker.jpg',
     active: '1',
   },
   {
@@ -36,7 +97,7 @@ export const collections = [
     name: 'Traditional Wear',
     slug: 'traditional',
     description: 'Ethiopian heritage meets handcrafted modern design.',
-    imageUrl: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=1200&auto=format&fit=crop',
+    imageUrl: '/images/products/ethiopian-traditional-woman.jpg',
     active: '1',
   },
   {
@@ -44,7 +105,7 @@ export const collections = [
     name: 'Accessories',
     slug: 'accessories',
     description: 'Finishing touches for every look.',
-    imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1200&auto=format&fit=crop',
+    imageUrl: '/images/products/accessories-flatlay.jpg',
     active: '1',
   },
   {
@@ -52,7 +113,7 @@ export const collections = [
     name: 'Outerwear',
     slug: 'outerwear',
     description: 'Layer up with versatile pieces for every season.',
-    imageUrl: 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=1200&auto=format&fit=crop',
+    imageUrl: '/images/products/outerwear-coat.jpg',
     active: '1',
   },
   {
@@ -60,7 +121,7 @@ export const collections = [
     name: 'Activewear',
     slug: 'activewear',
     description: 'Comfortable performance clothing made to move.',
-    imageUrl: 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=1200&auto=format&fit=crop',
+    imageUrl: '/images/products/activewear-training.jpg',
     active: '1',
   },
 ];
@@ -99,6 +160,8 @@ const demoProductsByCollection = {
     ["Men's Drawstring Chino Shorts", 'mens-drawstring-chino-shorts', 1750, 'Easy-fit chino shorts with an adjustable drawstring waist.', 'men'],
     ["Men's Everyday Cotton Hoodie", 'mens-everyday-cotton-hoodie', 2650, 'A comfortable cotton-blend hoodie for cool days.', 'men'],
     ["Men's Tapered Jogger Pants", 'mens-tapered-jogger-pants', 2300, 'Soft tapered joggers with a practical everyday fit.', 'men'],
+    ["Men's Textured Knit Polo", 'mens-textured-knit-polo', 2600, 'A refined knit polo with a subtle texture for elevated everyday style.', 'men'],
+    ["Men's Lightweight Utility Vest", 'mens-lightweight-utility-vest', 2950, 'An easy utility vest that layers neatly over tees and shirts.', 'men'],
   ],
   coll_women: [
     ["Women's Classic Cotton T-Shirt", 'womens-classic-cotton-tshirt', 1050, 'A soft everyday cotton tee with a clean, versatile shape.', 'women'],
@@ -109,6 +172,8 @@ const demoProductsByCollection = {
     ["Women's Ribbed Tank Top", 'womens-ribbed-tank-top', 1250, 'A soft ribbed tank for warm days and easy layering.', 'women'],
     ["Women's Tailored Ankle Pants", 'womens-tailored-ankle-pants', 2550, 'Polished ankle-length trousers with a comfortable tailored fit.', 'women'],
     ["Women's Floral Wrap Dress", 'womens-floral-wrap-dress', 3950, 'A versatile wrap dress with a colorful floral print.', 'women'],
+    ["Women's Satin Slip Dress", 'womens-satin-slip-dress', 4500, 'A sleek satin slip dress with a softly draped, elegant silhouette.', 'women'],
+    ["Women's Sporty Zip Hoodie", 'womens-sporty-zip-hoodie', 2400, 'A lightweight zip hoodie made for easy movement and casual layering.', 'women'],
   ],
   coll_kids: [
     ['Kids Cozy Cotton Sweatshirt', 'kids-cozy-cotton-sweatshirt', 1250, 'A soft cotton sweatshirt for school, play, and relaxing.', 'kids'],
@@ -119,6 +184,8 @@ const demoProductsByCollection = {
     ['Kids Weekend Pajama Set', 'kids-weekend-pajama-set', 1450, 'A soft and breathable pajama set for a comfortable night.', 'kids'],
     ['Kids Everyday Cotton Leggings', 'kids-everyday-cotton-leggings', 750, 'Stretchy cotton leggings made for comfort and movement.', 'kids'],
     ['Kids Classic Knit Cardigan', 'kids-classic-knit-cardigan', 1650, 'A cozy button-front cardigan for an extra warm layer.', 'kids'],
+    ['Kids Graphic Tee Set', 'kids-graphic-tee-set', 1100, 'A playful set of tees designed for easy everyday outfits and active play.', 'kids'],
+    ['Kids Stripe Pajama Set', 'kids-stripe-pajama-set', 1350, 'Soft striped pajamas made for a cozy bedtime routine.', 'kids'],
   ],
   coll_shoes: [
     ['Shoes - Everyday Leather Loafers', 'shoes-everyday-leather-loafers', 4200, 'Classic slip-on leather loafers for polished everyday outfits.', 'unisex'],
@@ -129,6 +196,8 @@ const demoProductsByCollection = {
     ['Shoes - Canvas Slip-On Sneakers', 'shoes-canvas-slip-on-sneakers', 1950, 'Easy slip-on canvas shoes with a flexible sole.', 'unisex'],
     ['Shoes - Everyday Court Sneakers', 'shoes-everyday-court-sneakers', 2900, 'Clean low-top court sneakers for casual daily wear.', 'unisex'],
     ['Shoes - Soft House Slides', 'shoes-soft-house-slides', 850, 'Lightweight cushioned slides for comfortable indoor use.', 'unisex'],
+    ['Shoes - Slip-On Training Trainers', 'shoes-slip-on-training-trainers', 3100, 'A flexible everyday trainer with supportive cushioning for daily wear.', 'unisex'],
+    ['Shoes - Waterproof Trail Sneakers', 'shoes-waterproof-trail-sneakers', 4700, 'Weather-ready sneakers built for city walks and day trips.', 'unisex'],
   ],
   coll_traditional: [
     ['Traditional Wear - Handwoven Habesha Scarf', 'traditional-wear-handwoven-habesha-scarf', 1850, 'A handwoven scarf inspired by Ethiopian textile traditions.', 'unisex'],
@@ -139,6 +208,8 @@ const demoProductsByCollection = {
     ['Traditional Wear - Ethiopian Woven Sash', 'traditional-wear-ethiopian-woven-sash', 1250, 'A colorful woven sash that adds a heritage-inspired finishing touch.', 'unisex'],
     ['Traditional Wear - Kids Habesha Dress', 'traditional-wear-kids-habesha-dress', 3600, 'A special-occasion cotton dress with traditional-inspired details.', 'kids'],
     ['Traditional Wear - Men Handwoven Cotton Tunic', 'traditional-wear-men-handwoven-cotton-tunic', 5200, 'A relaxed handwoven cotton tunic for celebrations and gatherings.', 'men'],
+    ['Traditional Wear - Elegant Women Gown', 'traditional-wear-elegant-women-gown', 7200, 'A graceful Ethiopian-inspired gown designed for celebrations and formal events.', 'women'],
+    ['Traditional Wear - Embroidered Kids Dress', 'traditional-wear-embroidered-kids-dress', 3900, 'A festive dress with hand-inspired embroidery and a comfortable cotton finish.', 'kids'],
   ],
   coll_accessories: [
     ['Accessories - Woven Everyday Tote Bag', 'accessories-woven-everyday-tote-bag', 1650, 'A roomy woven tote for everyday errands and weekend outings.', 'unisex'],
@@ -149,6 +220,8 @@ const demoProductsByCollection = {
     ['Accessories - Cotton Patterned Scarf', 'accessories-cotton-patterned-scarf', 1150, 'A lightweight patterned cotton scarf for any season.', 'unisex'],
     ['Accessories - Woven Bucket Hat', 'accessories-woven-bucket-hat', 1450, 'A relaxed woven hat for sunny days and casual outfits.', 'unisex'],
     ['Accessories - Everyday Sunglasses', 'accessories-everyday-sunglasses', 1250, 'Classic sunglasses with a lightweight comfortable frame.', 'unisex'],
+    ['Accessories - Structured Travel Tote', 'accessories-structured-travel-tote', 2450, 'A spacious structured tote with a polished everyday look.', 'unisex'],
+    ['Accessories - Leather Bracelet', 'accessories-leather-bracelet', 950, 'A minimal leather bracelet designed for a subtle finishing touch.', 'unisex'],
   ],
   coll_outerwear: [
     ['Outerwear - Everyday Denim Jacket', 'outerwear-everyday-denim-jacket', 4200, 'A classic denim jacket for easy year-round layering.', 'unisex'],
@@ -159,6 +232,8 @@ const demoProductsByCollection = {
     ['Outerwear - Everyday Zip-Up Windbreaker', 'outerwear-everyday-zip-up-windbreaker', 2950, 'A light zip-up windbreaker for breezy days outdoors.', 'unisex'],
     ['Outerwear - Soft Fleece-Lined Parka', 'outerwear-soft-fleece-lined-parka', 6900, 'A cozy fleece-lined parka for colder days and evening walks.', 'unisex'],
     ['Outerwear - Cropped Lightweight Jacket', 'outerwear-cropped-lightweight-jacket', 3650, 'A versatile cropped jacket for easy everyday layering.', 'women'],
+    ['Outerwear - Bomber Jacket', 'outerwear-bomber-jacket', 5100, 'A structured bomber jacket with a clean, modern fit.', 'unisex'],
+    ['Outerwear - Longline Trench Coat', 'outerwear-longline-trench-coat', 6600, 'A refined trench coat that transitions easily from work to weekend.', 'unisex'],
   ],
   coll_activewear: [
     ['Activewear - Breathable Training T-Shirt', 'activewear-breathable-training-tshirt', 1150, 'A quick-drying breathable tee for workouts and everyday movement.', 'unisex'],
@@ -169,6 +244,8 @@ const demoProductsByCollection = {
     ['Activewear - Performance Jogger Pants', 'activewear-performance-jogger-pants', 2450, 'Flexible jogger pants designed for workouts and rest days.', 'unisex'],
     ['Activewear - Quick-Dry Polo Shirt', 'activewear-quick-dry-polo-shirt', 1750, 'A lightweight quick-dry polo for active days and casual wear.', 'unisex'],
     ['Activewear - Stretch Cycling Tights', 'activewear-stretch-cycling-tights', 2650, 'Flexible cycling tights with a comfortable close fit.', 'unisex'],
+    ['Activewear - Soft Yoga Set', 'activewear-soft-yoga-set', 2500, 'A comfortable yoga set built for movement, recovery, and everyday comfort.', 'women'],
+    ['Activewear - Cooling Running Jersey', 'activewear-cooling-running-jersey', 2900, 'A lightweight running jersey with moisture-wicking comfort for active days.', 'unisex'],
   ],
 };
 
@@ -186,25 +263,25 @@ const categoryDemoRecords = Object.entries(demoProductsByCollection).flatMap(([c
   ]);
 });
 
-const uniqueDemoRecords = productRecords.map((record) => {
-  const [id, name, slug] = record;
-  return id.startsWith('demo_')
-    ? [id, name, slug, ...record.slice(3, 5), `https://picsum.photos/seed/wende-${slug}/800/1000`, ...record.slice(6)]
-    : record;
+const imageIndexes = new Map();
+export const products = [...productRecords, ...categoryDemoRecords].map(([id, name, slug, basePrice, description, legacyImageUrl, collectionId, gender]) => {
+  const index = imageIndexes.get(collectionId) || 0;
+  imageIndexes.set(collectionId, index + 1);
+  const imageUrl = getProductImage(collectionId, name, gender, index);
+  legacyProductImageUrls.set(id, legacyImageUrl);
+  return {
+    id,
+    name,
+    slug,
+    basePrice,
+    description,
+    imageUrl,
+    collectionId,
+    gender,
+    active: '1',
+    createdAt: new Date().toISOString(),
+  };
 });
-
-export const products = [...uniqueDemoRecords, ...categoryDemoRecords].map(([id, name, slug, basePrice, description, imageUrl, collectionId, gender]) => ({
-  id,
-  name,
-  slug,
-  basePrice,
-  description,
-  imageUrl,
-  collectionId,
-  gender,
-  active: '1',
-  createdAt: new Date().toISOString(),
-}));
 
 export const productVariants = products.flatMap((product) => {
   const collection = collections.find((item) => item.id === product.collectionId);

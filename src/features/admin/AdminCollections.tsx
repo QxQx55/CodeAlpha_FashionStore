@@ -187,7 +187,7 @@ export function AdminCollections() {
           <Card key={coll.id} className="overflow-hidden rounded-sm">
             <div className="aspect-video bg-secondary overflow-hidden">
               <img 
-                src={coll.imageUrl || 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=400'}
+                src={coll.imageUrl || '/images/products/accessories-flatlay.jpg'}
                 alt={coll.name}
                 className="h-full w-full object-cover"
               />

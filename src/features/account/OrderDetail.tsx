@@ -185,7 +185,7 @@ export function OrderDetail() {
             <div key={item.id} className="flex items-center p-4 space-x-4">
               <div className="h-20 w-16 bg-secondary overflow-hidden flex-shrink-0">
                 <img 
-                  src={item.variant?.images?.[0] || item.product?.imageUrl || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=200'} 
+                  src={item.variant?.images?.[0] || item.product?.imageUrl || '/images/products/men-model.jpg'}
                   alt={item.product?.name} 
                   className="h-full w-full object-cover"
                 />

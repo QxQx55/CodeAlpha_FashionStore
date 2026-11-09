@@ -48,7 +48,7 @@ export function CartDrawer() {
                         alt={item.product.name}
                         className="h-full w-full object-cover"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop';
+                          (e.target as HTMLImageElement).src = '/images/products/men-model.jpg';
                         }}
                       />
                     </div>

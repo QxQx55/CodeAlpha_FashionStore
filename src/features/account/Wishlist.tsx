@@ -77,7 +77,7 @@ export function Wishlist() {
               <Link to={`/products/${item.product.slug}`} className="block">
                 <div className="aspect-[3/4] bg-secondary overflow-hidden">
                   <img 
-                    src={item.product.imageUrl || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=400'} 
+                    src={item.product.imageUrl || '/images/products/men-model.jpg'}
                     alt={item.product.name}
                     className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />

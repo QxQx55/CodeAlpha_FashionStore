@@ -11,6 +11,7 @@ process.env.ADMIN_EMAIL = 'admin@example.com';
 process.env.CORS_ORIGINS = 'https://code-alpha-fashion-store-zuw8.vercel.app,https://code-alpha-fashion-store.vercel.app';
 process.env.STORE_MODE = 'live';
 const { createApp } = await import('./index.js');
+const { db } = await import('./store.js');
 let server;
 let baseUrl;
 
@@ -22,7 +23,6 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  const { db } = await import('./store.js');
   db.close();
   fs.rmSync(temporaryDirectory, { recursive: true, force: true });
 });
@@ -210,6 +210,9 @@ test('registers customers and places orders using current database prices and st
     }),
   });
   assert.equal(invalidProduct.response.status, 400);
+
+  db.prepare('DELETE FROM productVariants WHERE productId = ?').run(product.body.id);
+  db.prepare('DELETE FROM products WHERE id = ?').run(product.body.id);
 });
 
 test('sets security headers and limits repeated sign-in attempts', async () => {
@@ -282,7 +285,16 @@ test('seeds at least ten category-matched products into every active category', 
     assert.ok(matchingProducts.length >= 8, `expected category-matched demo products in ${category.name}`);
   }
   const imageUrls = products.body.map((product) => product.imageUrl);
-  assert.equal(new Set(imageUrls).size, imageUrls.length, 'every product must have a distinct main photo');
+  const nonLocalImages = imageUrls.filter((imageUrl) => !/^\/images\/products\/[a-z0-9-]+\.jpg$/.test(imageUrl));
+  assert.deepEqual(nonLocalImages, [], 'sample products should use locally stored photos');
+  for (const category of categories.body) {
+    const categoryImageUrls = new Set(
+      products.body
+        .filter((product) => product.collectionId === category.id)
+        .map((product) => product.imageUrl),
+    );
+    assert.ok(categoryImageUrls.size >= 2, `expected multiple relevant photos in ${category.name}`);
+  }
   const names = products.body.map((product) => product.name.trim().toLowerCase());
   assert.equal(new Set(names).size, names.length, 'product names must be unique');
 });

@@ -69,6 +69,8 @@ Vercel serves the frontend. The Express + SQLite API needs a persistent Node.js 
 
 Until your actual product names, prices, stock, and product photos are loaded, the storefront intentionally identifies its built-in catalog as preview/sample inventory. It must not be used to accept real orders. The photos currently in the sample catalog are stock imagery, not product photos or proof of actual inventory. Google Images is a search engine, not a license to copy photos; use your own product photos or images you have permission to use.
 
+The preview catalog and homepage hero use locally stored, category-matched illustrative photos under `public/images/`. Their sources and license/attribution details are in [public/images/SOURCES.md](public/images/SOURCES.md). Replace these illustrative photos with photos of the actual items before publishing real inventory.
+
 ## API
 
 - `GET /api/health`

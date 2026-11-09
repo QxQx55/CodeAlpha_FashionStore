@@ -17,7 +17,7 @@ interface ProductCardProps {
   };
 }
 
-const fallbackImage = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1020&auto=format&fit=crop';
+const fallbackImage = '/images/products/men-model.jpg';
 
 export function ProductCard({ product }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { collections, products, productVariants } from './seed.js';
+import { collections, legacyCollectionImageUrls, legacyProductImageUrls, products, productVariants } from './seed.js';
 
 const databasePath = process.env.DB_PATH || path.join(process.cwd(), 'data', 'store.sqlite');
 fs.mkdirSync(path.dirname(databasePath), { recursive: true });
@@ -114,6 +114,9 @@ export function initializeDatabase() {
     INSERT OR IGNORE INTO collections (id, name, slug, description, imageUrl, active)
     VALUES (@id, @name, @slug, @description, @imageUrl, @active)
   `);
+  const updateSeededCollectionImage = db.prepare(`
+    UPDATE collections SET imageUrl = @imageUrl WHERE id = @id AND imageUrl = @legacyImageUrl
+  `);
   const insertProduct = db.prepare(`
     INSERT OR IGNORE INTO products (id, name, slug, description, basePrice, imageUrl, collectionId, gender, active, createdAt)
     VALUES (@id, @name, @slug, @description, @basePrice, @imageUrl, @collectionId, @gender, @active, @createdAt)
@@ -122,19 +125,35 @@ export function initializeDatabase() {
     INSERT OR IGNORE INTO productVariants (id, productId, size, color, material, price, stock, imageUrls)
     VALUES (@id, @productId, @size, @color, @material, @price, @stock, @imageUrls)
   `);
-  const updateDemoProductImage = db.prepare(`
-    UPDATE products SET imageUrl = @imageUrl WHERE id = @id AND id LIKE 'demo_%'
+  const updateSeededProductImage = db.prepare(`
+    UPDATE products SET imageUrl = @imageUrl
+    WHERE id = @id AND (imageUrl = @legacyImageUrl OR id LIKE 'demo_%')
   `);
-  const updateDemoVariantImages = db.prepare(`
-    UPDATE productVariants SET imageUrls = ? WHERE productId = ? AND productId LIKE 'demo_%'
+  const updateSeededVariantImages = db.prepare(`
+    UPDATE productVariants SET imageUrls = @imageUrls
+    WHERE productId = @id AND (imageUrls = @legacyImageUrls OR productId LIKE 'demo_%')
   `);
   const seed = db.transaction(() => {
     collections.forEach((collection) => insertCollection.run(collection));
     products.forEach((product) => insertProduct.run(product));
     productVariants.forEach((variant) => insertVariant.run(variant));
-    products.filter((product) => product.id.startsWith('demo_')).forEach((product) => {
-      updateDemoProductImage.run(product);
-      updateDemoVariantImages.run(JSON.stringify([product.imageUrl]), product.id);
+    collections.forEach((collection) => updateSeededCollectionImage.run({
+      id: collection.id,
+      imageUrl: collection.imageUrl,
+      legacyImageUrl: legacyCollectionImageUrls[collection.id],
+    }));
+    products.forEach((product) => {
+      const legacyImageUrl = legacyProductImageUrls.get(product.id);
+      updateSeededProductImage.run({
+        id: product.id,
+        imageUrl: product.imageUrl,
+        legacyImageUrl,
+      });
+      updateSeededVariantImages.run({
+        id: product.id,
+        imageUrls: JSON.stringify([product.imageUrl]),
+        legacyImageUrls: JSON.stringify([legacyImageUrl]),
+      });
     });
   });
   seed();

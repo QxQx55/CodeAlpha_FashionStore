@@ -27,9 +27,6 @@ interface Product {
 const featuredCategorySlugs = ['women', 'men', 'traditional'];
 const previewCatalog = import.meta.env.VITE_CATALOG_MODE !== 'live';
 const categoryColors = ['bg-[#f6d23b]', 'bg-[#32bfca]', 'bg-[#ed9eaa]'];
-const categoryFallbackImages: Record<string, string> = {
-  men: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?q=80&w=900&auto=format&fit=crop',
-};
 
 export function Home() {
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -63,7 +60,7 @@ export function Home() {
           setCollections(collectionData.length > 0
             ? collectionData.map((collection: Collection) => ({
               ...collection,
-              fallbackImageUrl: categoryFallbackImages[collection.slug] || categoryFallbacks.get(collection.id) || `https://picsum.photos/seed/wende-category-${collection.slug}/900/1100`,
+              fallbackImageUrl: categoryFallbacks.get(collection.id) || collection.imageUrl || '',
             }))
             : MOCK_COLLECTIONS);
         }
@@ -108,13 +105,10 @@ export function Home() {
         <div className="relative mx-auto grid min-h-[290px] max-w-[1240px] grid-cols-[0.88fr_1.12fr] overflow-hidden bg-[#adedef] sm:min-h-[350px] lg:min-h-[370px]">
           <div className="relative min-h-full overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?q=85&w=1050&auto=format&fit=crop"
+              src="/images/hero-fashion.jpg"
               alt="A model wearing a colorful contemporary fashion look"
               className="absolute inset-0 h-full w-full object-cover object-[center_25%]"
               fetchPriority="high"
-              onError={(event) => {
-                event.currentTarget.src = 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=85&w=1050&auto=format&fit=crop';
-              }}
             />
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#adedef]/20" />
           </div>
@@ -194,12 +188,12 @@ export function Home() {
                 </span>
               </div>
               <img
-                src={collection.imageUrl || collection.fallbackImageUrl || `https://picsum.photos/seed/wende-category-${collection.slug}/700/650`}
+                src={collection.imageUrl || collection.fallbackImageUrl || '/images/products/accessories-flatlay.jpg'}
                 alt={`${collection.name} collection`}
                 loading="lazy"
                 className="absolute right-0 h-full w-[45%] object-cover object-center mix-blend-multiply transition-transform duration-500 group-hover:scale-[1.04]"
                 onError={(event) => {
-                  const fallbackImage = collection.fallbackImageUrl || `https://picsum.photos/seed/wende-category-${collection.slug}/700/650`;
+                  const fallbackImage = collection.fallbackImageUrl || collection.imageUrl || '/images/products/accessories-flatlay.jpg';
                   if (event.currentTarget.src !== fallbackImage) event.currentTarget.src = fallbackImage;
                 }}
               />
@@ -224,7 +218,7 @@ export function Home() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4">
-          {products.length > 0 ? products.slice(0, 8).map((product) => (
+          {products.length > 0 ? products.slice(0, 10).map((product) => (
             <ProductCard key={product.id} product={product} />
           )) : !loadError && [1, 2, 3, 4].map((item) => (
             <div key={item} className="animate-pulse space-y-3">

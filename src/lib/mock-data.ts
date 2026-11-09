@@ -1,10 +1,56 @@
+const PRODUCT_IMAGES: Record<string, string[]> = {
+  coll_men: ['/images/products/men-model.jpg', '/images/products/men-editorial.jpg', '/images/products/men-flatlay.jpg'],
+  coll_women: ['/images/products/women-dress-floral.jpg', '/images/products/women-dress-red.jpg', '/images/products/women-apparel-rack.jpg'],
+  coll_kids: ['/images/products/kids-model.jpg', '/images/products/kids-apparel-rack.jpg'],
+  coll_shoes: ['/images/products/shoes-derby.jpg', '/images/products/shoes-sneaker.jpg', '/images/products/shoes-fashion.jpg'],
+  coll_traditional: ['/images/products/ethiopian-traditional-man.jpg', '/images/products/ethiopian-traditional-woman.jpg', '/images/products/ethiopian-traditional-kids.jpg', '/images/products/ethiopian-garment-detail.jpg'],
+  coll_accessories: ['/images/products/accessories-flatlay.jpg', '/images/products/accessories-watch.jpg', '/images/products/accessories-bag.jpg'],
+  coll_outerwear: ['/images/products/outerwear-editorial.jpg', '/images/products/outerwear-coat.jpg', '/images/products/outerwear-jacket.jpg'],
+  coll_activewear: ['/images/products/activewear-training.jpg', '/images/products/activewear-leggings.jpg', '/images/products/activewear-runner.jpg'],
+};
+
+function getProductImage(collectionId: string, name: string, index: number): string {
+  const images = PRODUCT_IMAGES[collectionId];
+  if (!images) throw new Error(`Missing product image mapping for ${collectionId}`);
+  const normalizedName = name.toLowerCase();
+
+  if (collectionId === 'coll_traditional') {
+    if (/men/.test(normalizedName)) return images[0];
+    if (/children|kids/.test(normalizedName)) return images[2];
+    if (/scarf|shawl|netela|sash|garment/.test(normalizedName)) return images[3];
+    return images[1];
+  }
+  if (collectionId === 'coll_men') {
+    if (/pant|jean|chino|short/.test(normalizedName)) return images[2];
+    if (/jacket|coat|overshirt/.test(normalizedName)) return images[1];
+  } else if (collectionId === 'coll_shoes') {
+    if (/derby|loafer|boot|formal/.test(normalizedName)) return images[0];
+    if (/sneaker|runner|trainer|canvas|running/.test(normalizedName)) return images[1];
+  } else if (collectionId === 'coll_accessories') {
+    if (/watch|chronograph/.test(normalizedName)) return images[1];
+    if (/bag|tote/.test(normalizedName)) return images[2];
+  } else if (collectionId === 'coll_outerwear') {
+    if (/coat|overcoat/.test(normalizedName)) return images[1];
+    if (/jacket|raincoat/.test(normalizedName)) return images[2];
+  } else if (collectionId === 'coll_activewear') {
+    if (/legging|tight/.test(normalizedName)) return images[1];
+    if (/run|short/.test(normalizedName)) return images[2];
+  } else if (collectionId === 'coll_women' && /dress|skirt/.test(normalizedName)) {
+    return images[0];
+  } else if (collectionId === 'coll_kids' && /dress|jacket|coat/.test(normalizedName)) {
+    return images[1];
+  }
+
+  return images[index % images.length];
+}
+
 export const MOCK_COLLECTIONS = [
   {
     id: 'coll_men',
     name: 'Men',
     slug: 'men',
     description: 'Modern and stylish apparel for men. From casual shirts to tailored pants.',
-    imageUrl: 'https://images.unsplash.com/photo-1488161628813-24479dcbc2ef?q=80&w=2000&auto=format&fit=crop',
+    imageUrl: '/images/products/men-model.jpg',
     active: true
   },
   {
@@ -12,7 +58,7 @@ export const MOCK_COLLECTIONS = [
     name: 'Women',
     slug: 'women',
     description: 'Elegant dresses, chic tops, and contemporary styles for the modern woman.',
-    imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=2000&auto=format&fit=crop',
+    imageUrl: '/images/products/women-dress-floral.jpg',
     active: true
   },
   {
@@ -20,7 +66,7 @@ export const MOCK_COLLECTIONS = [
     name: 'Kids',
     slug: 'kids',
     description: 'Comfortable and fun clothing for the little ones.',
-    imageUrl: 'https://images.unsplash.com/photo-1519234110450-1aa963672068?q=80&w=2000&auto=format&fit=crop',
+    imageUrl: '/images/products/kids-model.jpg',
     active: true
   },
   {
@@ -28,7 +74,7 @@ export const MOCK_COLLECTIONS = [
     name: 'Shoes',
     slug: 'shoes',
     description: 'A wide selection of footwear, from classic sneakers to formal dress shoes.',
-    imageUrl: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=2000&auto=format&fit=crop',
+    imageUrl: '/images/products/shoes-sneaker.jpg',
     active: true
   },
   {
@@ -36,7 +82,7 @@ export const MOCK_COLLECTIONS = [
     name: 'Traditional Wear',
     slug: 'traditional',
     description: 'Exquisite Habesha clothes, celebrating Ethiopian heritage with handcrafted details.',
-    imageUrl: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=2000&auto=format&fit=crop',
+    imageUrl: '/images/products/ethiopian-traditional-woman.jpg',
     active: true
   },
   {
@@ -44,7 +90,7 @@ export const MOCK_COLLECTIONS = [
     name: 'Accessories',
     slug: 'accessories',
     description: 'The finishing touches for any look. Watches, bags, and eyewear.',
-    imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=2000&auto=format&fit=crop',
+    imageUrl: '/images/products/accessories-flatlay.jpg',
     active: true
   },
   {
@@ -52,7 +98,7 @@ export const MOCK_COLLECTIONS = [
     name: 'Outerwear',
     slug: 'outerwear',
     description: 'Durable coats and jackets built to withstand the elements.',
-    imageUrl: 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=2000&auto=format&fit=crop',
+    imageUrl: '/images/products/outerwear-coat.jpg',
     active: true
   },
   {
@@ -60,11 +106,12 @@ export const MOCK_COLLECTIONS = [
     name: 'Activewear',
     slug: 'activewear',
     description: 'High-performance gear designed for movement and endurance.',
-    imageUrl: 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=2000&auto=format&fit=crop',
+    imageUrl: '/images/products/activewear-training.jpg',
     active: true
   }
 ];
 
+const imageIndexes = new Map<string, number>();
 export const MOCK_PRODUCTS = [
   // Traditional Wear (Habesha clothes)
   { id: 'hab_1', name: 'Classic Men\'s Habesha Kemis', slug: 'classic-mens-habesha-kemis', basePrice: 4500, description: 'A traditional men\'s white cotton tunic with hand-embroidered Tilf patterns.', imageUrl: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=2000&auto=format&fit=crop', collectionId: 'coll_traditional', active: true, images: ['https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=2000&auto=format&fit=crop'] },
@@ -120,7 +167,12 @@ export const MOCK_PRODUCTS = [
   { id: 'sho_7', name: 'Leather Suede Loafers', slug: 'leather-suede-loafers', basePrice: 4200, description: 'Comfortable and stylish loafers for everyday elegance.', imageUrl: 'https://images.unsplash.com/photo-1560343090-f0409e92791a?q=80&w=2000&auto=format&fit=crop', collectionId: 'coll_shoes', active: true, images: ['https://images.unsplash.com/photo-1560343090-f0409e92791a?q=80&w=2000&auto=format&fit=crop'] },
   { id: 'kid_6', name: 'Cotton Summer Set (Kids)', slug: 'cotton-summer-set-kids', basePrice: 1800, description: 'Breathable and colorful set for warm Addis days.', imageUrl: 'https://images.unsplash.com/photo-1519234110450-1aa963672068?q=80&w=2000&auto=format&fit=crop', collectionId: 'coll_kids', active: true, images: ['https://images.unsplash.com/photo-1519234110450-1aa963672068?q=80&w=2000&auto=format&fit=crop'] },
   { id: 'acc_4', name: 'Hand-Woven Straw Tote', slug: 'hand-woven-straw-tote', basePrice: 2200, description: 'Lightweight and durable tote bag for summer outings.', imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=2000&auto=format&fit=crop', collectionId: 'coll_accessories', active: true, images: ['https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=2000&auto=format&fit=crop'] }
-];
+].map((product) => {
+  const index = imageIndexes.get(product.collectionId) ?? 0;
+  imageIndexes.set(product.collectionId, index + 1);
+  const imageUrl = getProductImage(product.collectionId, product.name, index);
+  return { ...product, imageUrl, images: [imageUrl] };
+});
 
 export const MOCK_VARIANTS = [
   // Traditional Wear Variants
