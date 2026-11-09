@@ -32,7 +32,7 @@ export function ProductDetail() {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [previewCatalog, setPreviewCatalog] = useState(false);
+  const [previewCatalog, setPreviewCatalog] = useState(import.meta.env.VITE_CATALOG_MODE !== 'live');
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);

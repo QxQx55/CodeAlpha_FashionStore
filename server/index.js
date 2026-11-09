@@ -311,6 +311,9 @@ function createApp() {
 
   app.post('/api/checkout', authenticate, async (req, res, next) => {
     try {
+      if (process.env.STORE_MODE !== 'live') {
+        throw new HttpError(503, 'Checkout is disabled while the store is using preview inventory.');
+      }
       const address = req.body?.shippingAddress;
       const paymentMethod = req.body?.paymentMethod;
       if (!address || typeof address !== 'object' || Array.isArray(address)) {

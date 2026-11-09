@@ -8,7 +8,8 @@ const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'wende-store-te
 process.env.DB_PATH = path.join(temporaryDirectory, 'store.sqlite');
 process.env.JWT_SECRET = 'test-secret';
 process.env.ADMIN_EMAIL = 'admin@example.com';
-process.env.CORS_ORIGINS = 'https://code-alpha-fashion-store.vercel.app';
+process.env.CORS_ORIGINS = 'https://code-alpha-fashion-store-zuw8.vercel.app,https://code-alpha-fashion-store.vercel.app';
+process.env.STORE_MODE = 'live';
 const { createApp } = await import('./index.js');
 let server;
 let baseUrl;
@@ -71,6 +72,16 @@ test('registers customers and places orders using current database prices and st
 
   const unauthenticatedCart = await request('/api/cartItems');
   assert.equal(unauthenticatedCart.response.status, 401);
+
+  process.env.STORE_MODE = 'preview';
+  const previewCheckout = await request('/api/checkout', {
+    token,
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  assert.equal(previewCheckout.response.status, 503);
+  assert.match(previewCheckout.body.error, /preview inventory/);
+  process.env.STORE_MODE = 'live';
 
   const excessiveCartItem = await request('/api/cartItems', {
     method: 'POST',
@@ -209,14 +220,14 @@ test('sets security headers and limits repeated sign-in attempts', async () => {
   assert.match(health.response.headers.get('content-security-policy'), /frame-ancestors 'none'/);
 
   const allowedOrigin = await fetch(`${baseUrl}/api/health`, {
-    headers: { Origin: 'https://code-alpha-fashion-store.vercel.app' },
+    headers: { Origin: 'https://code-alpha-fashion-store-zuw8.vercel.app' },
   });
-  assert.equal(allowedOrigin.headers.get('access-control-allow-origin'), 'https://code-alpha-fashion-store.vercel.app');
+  assert.equal(allowedOrigin.headers.get('access-control-allow-origin'), 'https://code-alpha-fashion-store-zuw8.vercel.app');
 
   const preflight = await fetch(`${baseUrl}/api/health`, {
     method: 'OPTIONS',
     headers: {
-      Origin: 'https://code-alpha-fashion-store.vercel.app',
+      Origin: 'https://code-alpha-fashion-store-zuw8.vercel.app',
       'Access-Control-Request-Method': 'POST',
       'Access-Control-Request-Headers': 'authorization,content-type',
     },

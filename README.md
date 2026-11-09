@@ -55,19 +55,19 @@ npm start
 
 The Express server serves the built frontend and API on the same port (default `4000`). Set `JWT_SECRET` to a long, unique secret and configure `PORT` as needed. Set `DB_PATH` to a persistent writable file path when deploying so SQLite data survives restarts. Set `ADMIN_EMAIL` before registering your administrator account. For Chapa, set `CHAPA_SECRET_KEY` and `PUBLIC_APP_URL` on the API server; use HTTPS in production. The default development JWT secret is rejected in production unless `JWT_SECRET` is set.
 
-## Deploying the frontend to Vercel
+## Deploying the storefront and API
 
-Vercel serves the Vite frontend, but it does not run this app's long-lived Express + SQLite server as a static deployment. Deploy the Express app separately on a Node.js host with a persistent disk, and set its `DB_PATH` to a file on that disk. Configure the API host with:
+Vercel serves the frontend. The Express + SQLite API needs a persistent Node.js host; SQLite must not be stored on Vercel's temporary filesystem. A Render Blueprint is provided in `render.yaml` and provisions the API, a persistent 1 GB disk, production JWT secret, and health check. Render's persistent disk requires a paid web-service plan.
 
-- `NODE_ENV=production`
-- `JWT_SECRET` (at least 32 characters)
-- `DB_PATH` (on persistent storage)
-- `CORS_ORIGINS=https://code-alpha-fashion-store.vercel.app` (include any other exact storefront origins, comma-separated)
-- `PUBLIC_APP_URL=https://code-alpha-fashion-store.vercel.app`
+1. In Render, choose **New → Blueprint**, connect this repository and deploy `render.yaml`.
+2. Wait for the API service to become healthy, then verify `https://<your-render-service>.onrender.com/api/health` returns `{"status":"ok"}`.
+3. In the Vercel project's Production environment variables, set `VITE_API_URL` to the API service's HTTPS origin (no trailing slash), then redeploy the frontend.
+4. If using Chapa, set `CHAPA_SECRET_KEY` in Render. Set `ADMIN_EMAIL` there before registering the store owner account.
+5. After uploading your real product data and photos and confirming stock, set `STORE_MODE=live` in Render and `VITE_CATALOG_MODE=live` in Vercel, then redeploy both. Until then, checkout is blocked by the API and the frontend labels the catalog as preview-only.
 
-In the Vercel project settings, set `VITE_API_URL` to the API host's HTTPS origin (for example, `https://your-api-host.example.com`) for Production, then redeploy. This value is public and must not contain secrets. The frontend uses the Vite dev-server proxy locally when `VITE_API_URL` is unset.
+`VITE_API_URL` is public and must never contain secrets. `render.yaml` allows the current Vercel deployment domains via `CORS_ORIGINS`; add any custom storefront domain there before deployment. `PUBLIC_APP_URL` is used for payment return links. The frontend uses Vite's local API proxy when `VITE_API_URL` is unset.
 
-Vercel's build configuration is in `vercel.json`. The API health check is `GET /api/health`. Without a reachable API, the storefront and catalog pages display demo products, but account, cart, and checkout features require the API. Configure `CHAPA_SECRET_KEY` only on the API host if hosted checkout is needed.
+Until your actual product names, prices, stock, and product photos are loaded, the storefront intentionally identifies its built-in catalog as preview/sample inventory. It must not be used to accept real orders. The photos currently in the sample catalog are stock imagery, not product photos or proof of actual inventory. Google Images is a search engine, not a license to copy photos; use your own product photos or images you have permission to use.
 
 ## API
 

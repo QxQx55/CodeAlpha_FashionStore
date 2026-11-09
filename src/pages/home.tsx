@@ -25,6 +25,7 @@ interface Product {
 }
 
 const featuredCategorySlugs = ['women', 'men', 'traditional'];
+const previewCatalog = import.meta.env.VITE_CATALOG_MODE !== 'live';
 const categoryColors = ['bg-[#f6d23b]', 'bg-[#32bfca]', 'bg-[#ed9eaa]'];
 const categoryFallbackImages: Record<string, string> = {
   men: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?q=80&w=900&auto=format&fit=crop',
@@ -171,9 +172,9 @@ export function Home() {
         </div>
       </section>
 
-      {loadError && (
+      {(previewCatalog || loadError) && (
         <p role="status" className="container mx-auto max-w-[1050px] px-3 py-3 text-center text-sm text-red-700 sm:px-5">
-          Demo storefront: {loadError}
+          Preview catalog: {loadError || 'These are sample listings, not confirmed products or inventory. Shopping is disabled until your real catalog is loaded.'}
         </p>
       )}
 
