@@ -33,7 +33,7 @@ const initialAddress: ShippingAddress = {
 };
 
 export function Checkout() {
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, clearCart, isLoading: isCartLoading } = useCart();
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -101,7 +101,7 @@ export function Checkout() {
     }
   };
 
-  if (isLoading) return <div className="py-40 text-center animate-pulse">Loading...</div>;
+  if (isLoading || isCartLoading) return <div className="py-40 text-center animate-pulse">Loading...</div>;
 
   if (items.length === 0) {
     return (

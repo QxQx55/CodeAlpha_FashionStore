@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { storeApi } from '@/lib/store-api';
 import { useAuth } from './auth-provider';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
+  isLoading: boolean;
   addItem: (variantId: string, quantity: number) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
@@ -37,61 +38,72 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const cartRequestId = useRef(0);
 
   const fetchCart = async () => {
+    const requestId = ++cartRequestId.current;
     if (!user) {
       setItems([]);
+      setIsLoading(false);
       return;
     }
 
-    const data = await (storeApi.db as any).cartItems.list();
+    setIsLoading(true);
+    try {
+      const data = await (storeApi.db as any).cartItems.list();
 
-    const enrichedItems = await Promise.all(
-      (data as any[]).map(async (item) => {
-        const variantData = await (storeApi.db as any).productVariants.list({
-          where: { id: item.variantId }
-        });
-        const v = variantData[0] as any;
-        if (!v) return null;
+      const enrichedItems = await Promise.all(
+        (data as any[]).map(async (item) => {
+          const variantData = await (storeApi.db as any).productVariants.list({
+            where: { id: item.variantId }
+          });
+          const v = variantData[0] as any;
+          if (!v) return null;
 
-        const productData = await (storeApi.db as any).products.list({
-          where: { id: v.productId }
-        });
-        const p = productData[0] as any;
-        if (!p) return null;
+          const productData = await (storeApi.db as any).products.list({
+            where: { id: v.productId }
+          });
+          const p = productData[0] as any;
+          if (!p) return null;
 
-        let images = [];
-        try {
-          images = JSON.parse(v.imageUrls || '[]');
-        } catch {
-          images = v.imageUrls ? [v.imageUrls] : [];
-        }
-
-        if (images.length === 0 && p.imageUrl) {
-          images = [p.imageUrl];
-        }
-
-        return {
-          id: item.id,
-          variantId: item.variantId,
-          quantity: item.quantity,
-          product: {
-            name: p.name,
-            image: images[0] || '/images/products/men-model.jpg',
-            basePrice: p.basePrice
-          },
-          variant: {
-            size: v.size,
-            color: v.color,
-            price: v.price,
-            stock: v.stock
+          let images = [];
+          try {
+            images = JSON.parse(v.imageUrls || '[]');
+          } catch {
+            images = v.imageUrls ? [v.imageUrls] : [];
           }
-        };
-      })
-    );
 
-    setItems(enrichedItems.filter(Boolean) as CartItem[]);
+          if (images.length === 0 && p.imageUrl) {
+            images = [p.imageUrl];
+          }
+
+          return {
+            id: item.id,
+            variantId: item.variantId,
+            quantity: item.quantity,
+            product: {
+              name: p.name,
+              image: images[0] || '/images/products/men-model.jpg',
+              basePrice: p.basePrice
+            },
+            variant: {
+              size: v.size,
+              color: v.color,
+              price: v.price,
+              stock: v.stock
+            }
+          };
+        })
+      );
+
+      if (requestId === cartRequestId.current) {
+        setItems(enrichedItems.filter(Boolean) as CartItem[]);
+      }
+    } finally {
+      if (requestId === cartRequestId.current) setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -99,6 +111,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to fetch cart:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to load your cart.');
     });
+    return () => {
+      cartRequestId.current += 1;
+    };
   }, [user]);
 
   const addItem = async (variantId: string, quantity: number) => {
@@ -166,6 +181,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     <CartContext.Provider
       value={{
         items,
+        isLoading,
         addItem,
         removeItem,
         updateQuantity,

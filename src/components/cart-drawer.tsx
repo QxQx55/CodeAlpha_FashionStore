@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate } from 'react-router-dom';
 
 export function CartDrawer() {
-  const { items, subtotal, removeItem, updateQuantity, isOpen, setIsOpen } = useCart();
+  const { items, totalCount, subtotal, removeItem, updateQuantity, isOpen, setIsOpen } = useCart();
   const navigate = useNavigate();
 
   const handleCheckout = () => {
@@ -23,7 +23,7 @@ export function CartDrawer() {
           <SheetTitle className="flex items-center justify-between">
             <span className="font-serif text-xl">Shopping Cart</span>
             <span className="text-xs font-normal text-muted-foreground uppercase tracking-widest">
-              {items.length} {items.length === 1 ? 'Item' : 'Items'}
+              {totalCount} {totalCount === 1 ? 'Item' : 'Items'}
             </span>
           </SheetTitle>
         </SheetHeader>
