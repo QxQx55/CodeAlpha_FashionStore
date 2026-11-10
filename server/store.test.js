@@ -54,6 +54,59 @@ test('allows storefront requests from the custom production domains', async () =
   }
 });
 
+test('serves footer content publicly and restricts edits to administrators', async () => {
+  const emptySettings = await request('/api/storefront-settings');
+  assert.equal(emptySettings.response.status, 200);
+  assert.deepEqual(emptySettings.body, { shippingReturns: '', newsletterOffer: '' });
+
+  const unauthenticatedUpdate = await request('/api/admin/storefront-settings', {
+    method: 'PUT',
+    body: JSON.stringify({ shippingReturns: 'Shipping details', newsletterOffer: 'Offer details' }),
+  });
+  assert.equal(unauthenticatedUpdate.response.status, 401);
+
+  const customer = await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email: 'settings-customer@example.com', password: 'secure-password-3', displayName: 'Customer' }),
+  });
+  const customerUpdate = await request('/api/admin/storefront-settings', {
+    method: 'PUT',
+    token: customer.body.token,
+    body: JSON.stringify({ shippingReturns: 'Shipping details', newsletterOffer: 'Offer details' }),
+  });
+  assert.equal(customerUpdate.response.status, 403);
+
+  const originalAdminEmail = process.env.ADMIN_EMAIL;
+  process.env.ADMIN_EMAIL = 'settings-admin@example.com';
+  const admin = await request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email: 'settings-admin@example.com', password: 'secure-password-4', displayName: 'Admin' }),
+  });
+  process.env.ADMIN_EMAIL = originalAdminEmail;
+  assert.equal(admin.body.user.isAdmin, true);
+
+  const content = {
+    shippingReturns: 'Delivery information\nReturns contact us for details.',
+    newsletterOffer: 'A confirmed store offer.',
+  };
+  const savedSettings = await request('/api/admin/storefront-settings', {
+    method: 'PUT',
+    token: admin.body.token,
+    body: JSON.stringify(content),
+  });
+  assert.equal(savedSettings.response.status, 200);
+  assert.deepEqual(savedSettings.body, content);
+  const persistedSettings = await request('/api/storefront-settings');
+  assert.deepEqual(persistedSettings.body, content);
+
+  const oversizedSettings = await request('/api/admin/storefront-settings', {
+    method: 'PUT',
+    token: admin.body.token,
+    body: JSON.stringify({ shippingReturns: 'x'.repeat(5001), newsletterOffer: '' }),
+  });
+  assert.equal(oversizedSettings.response.status, 400);
+});
+
 test('registers customers and places orders using current database prices and stock', async () => {
   const catalog = await request('/api/products?where=%7B%22slug%22%3A%22classic-mens-habesha-kemis%22%7D');
   assert.equal(catalog.response.status, 200);

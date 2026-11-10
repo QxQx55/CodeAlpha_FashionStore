@@ -8,6 +8,7 @@ import { AdminProducts } from '@/features/admin/AdminProducts';
 import { AdminCollections } from '@/features/admin/AdminCollections';
 import { AdminOrders } from '@/features/admin/AdminOrders';
 import { AdminReturns } from '@/features/admin/AdminReturns';
+import { AdminStorefrontSettings } from '@/features/admin/AdminStorefrontSettings';
 import { useAuth } from '@/components/auth-provider';
 import { Button } from '@/components/ui/button';
 
@@ -42,6 +43,7 @@ export function AdminDashboard() {
         <Route path="collections" element={<AdminCollections />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="returns" element={<AdminReturns />} />
+        <Route path="storefront" element={<AdminStorefrontSettings />} />
       </Routes>
     </AdminLayout>
   );

@@ -77,8 +77,7 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full bg-white">
       <div className="bg-[#f5f5f5] px-4 py-1.5 text-center text-[10px] tracking-wide text-[#555] sm:text-left">
         <div className="container mx-auto flex items-center justify-between">
-          <span>Free delivery on orders over 5,000 ETB</span>
-          <span className="hidden sm:inline">Thoughtful Ethiopian fashion · Welcome to Wende</span>
+          <span>Welcome to Wende Brand</span>
         </div>
       </div>
 

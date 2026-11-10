@@ -254,6 +254,45 @@ function createApp() {
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+  app.get('/api/storefront-settings', (_req, res) => {
+    const settings = db.prepare(`
+      SELECT key, value
+      FROM storeSettings
+      WHERE key IN (?, ?)
+    `).all('footer.shippingReturns', 'footer.newsletterOffer');
+    const values = Object.fromEntries(settings.map(({ key, value }) => [key, value]));
+    res.json({
+      shippingReturns: values['footer.shippingReturns'] || '',
+      newsletterOffer: values['footer.newsletterOffer'] || '',
+    });
+  });
+  app.put('/api/admin/storefront-settings', authenticate, requireAdmin, (req, res, next) => {
+    try {
+      const { shippingReturns, newsletterOffer } = req.body || {};
+      if (typeof shippingReturns !== 'string' || typeof newsletterOffer !== 'string') {
+        throw new HttpError(400, 'Shipping and returns text and newsletter offer must be provided as text.');
+      }
+      if (shippingReturns.length > 5000 || newsletterOffer.length > 1000) {
+        throw new HttpError(400, 'Shipping and returns text must be 5,000 characters or fewer and the offer must be 1,000 or fewer.');
+      }
+
+      const saveSettings = db.transaction(() => {
+        const save = db.prepare(`
+          INSERT INTO storeSettings (key, value) VALUES (?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        `);
+        save.run('footer.shippingReturns', shippingReturns.trim());
+        save.run('footer.newsletterOffer', newsletterOffer.trim());
+      });
+      saveSettings();
+      res.json({
+        shippingReturns: shippingReturns.trim(),
+        newsletterOffer: newsletterOffer.trim(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
   app.get('/api/payments/chapa/status', (_req, res) => {
     const storeMode = getStoreMode();
     const previewMode = storeMode !== 'live';

@@ -12,6 +12,7 @@ import { CheckoutComplete } from './pages/checkout-complete';
 import { AdminDashboard } from './pages/admin/dashboard';
 import { Login } from './pages/login';
 import { Register } from './pages/register';
+import { LegalPolicyDraft, ShippingReturns } from './pages/store-policy';
 
 function App() {
   return (
@@ -28,6 +29,9 @@ function App() {
               <Route path="/account/*" element={<Account />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/checkout/complete" element={<CheckoutComplete />} />
+              <Route path="/shipping-returns" element={<ShippingReturns />} />
+              <Route path="/privacy-policy" element={<LegalPolicyDraft kind="privacy" />} />
+              <Route path="/terms-of-service" element={<LegalPolicyDraft kind="terms" />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
             </Routes>
           </Layout>

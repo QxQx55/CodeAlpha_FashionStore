@@ -5,7 +5,8 @@ import {
   Package, 
   Layers, 
   ShoppingBag, 
-  RotateCcw
+  RotateCcw,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +16,7 @@ const navItems = [
   { label: 'Collections', path: '/admin/collections', icon: Layers },
   { label: 'Orders', path: '/admin/orders', icon: ShoppingBag },
   { label: 'Returns', path: '/admin/returns', icon: RotateCcw },
+  { label: 'Storefront Content', path: '/admin/storefront', icon: Settings },
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {

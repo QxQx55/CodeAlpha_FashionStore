@@ -37,6 +37,8 @@ Alternatively, add `ADMIN_EMAIL=owner@example.com` to `.env.local`. If you chang
 
 Administrators can add a product in **Manage Store → Products → Add Product**. Select an existing category, enter a price and the actual stock quantity for each size, upload or provide a product photo, and choose whether the listing is active. Stock values are required per size; the form does not assume inventory quantities. Saving writes the product and its variants to SQLite in one transaction. With `STORE_MODE=auto`, the first active product with a photo and positive stock automatically enables live checkout. Seeded sample products stay visible with a sample label but are never purchasable. Editing a product's base price updates variants that still use that base price.
 
+Administrators can edit footer copy at **Manage Store → Storefront Content**. Shipping and returns appears publicly only after text is saved. Newsletter-offer copy is shown as plain information; newsletter signup is not connected. Privacy and Terms links are clearly marked as drafts that require owner review.
+
 Do not expose the development server publicly.
 
 ## Verification
@@ -74,6 +76,7 @@ The preview catalog and homepage hero use locally stored, category-matched illus
 ## API
 
 - `GET /api/health`
+- `GET /api/storefront-settings` (public footer copy), `PUT /api/admin/storefront-settings` (administrator only)
 - `GET /api/collections`, `GET /api/products`, `GET /api/productVariants` (optional JSON `where` query)
 - `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
 - Authenticated catalog-variant, cart, and wishlist endpoints under `/api`

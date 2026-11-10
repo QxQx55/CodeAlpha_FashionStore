@@ -14,6 +14,11 @@ export interface StoreOrder {
   createdAt: string;
 }
 
+export interface StorefrontSettings {
+  shippingReturns: string;
+  newsletterOffer: string;
+}
+
 export type CheckoutResult = StoreOrder | {
   orderId: string;
   txRef: string;
@@ -107,6 +112,11 @@ const db = Object.fromEntries(resourceNames.map((resource) => [
 export const storeApi = {
   db,
   api: {
+    getStorefrontSettings: () => apiRequest<StorefrontSettings>('/api/storefront-settings'),
+    saveStorefrontSettings: (settings: StorefrontSettings) => apiRequest<StorefrontSettings>('/api/admin/storefront-settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
     uploadProductImage: (file: File) => apiRequest<{ imageUrl: string }>('/api/admin/product-images', {
       method: 'POST',
       headers: { 'Content-Type': file.type },
