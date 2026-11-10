@@ -691,15 +691,47 @@ function createApp() {
       if (!db.prepare('SELECT id FROM collections WHERE id = ? AND active = ?').get(fields.collectionId, '1')) {
         throw new HttpError(400, 'Choose an active product category.');
       }
-      const initialStock = Number(req.body?.initialStock ?? 25);
-      if (!Number.isInteger(initialStock) || initialStock < 0 || initialStock > 1000000) {
-        throw new HttpError(400, 'Initial stock must be a whole number between 0 and 1,000,000.');
-      }
       const sizes = Array.isArray(req.body?.sizes)
         ? [...new Set(req.body.sizes.map((size) => String(size).trim()).filter(Boolean))]
         : ['One Size'];
       if (sizes.length === 0 || sizes.length > 30 || sizes.some((size) => size.length > 30)) {
         throw new HttpError(400, 'Add between 1 and 30 valid product sizes.');
+      }
+      let sizeStocks;
+      if (req.body?.sizeStocks === undefined) {
+        const initialStock = Number(req.body?.initialStock ?? 25);
+        if (!Number.isInteger(initialStock) || initialStock < 0 || initialStock > 1000000) {
+          throw new HttpError(400, 'Initial stock must be a whole number between 0 and 1,000,000.');
+        }
+        sizeStocks = sizes.map((size) => ({ size, stock: initialStock }));
+      } else {
+        if (!Array.isArray(req.body.sizeStocks) || req.body.sizeStocks.length !== sizes.length) {
+          throw new HttpError(400, 'Provide stock for every product size.');
+        }
+        const seenSizes = new Set();
+        sizeStocks = req.body.sizeStocks.map((variant) => {
+          if (!variant || typeof variant !== 'object' || Array.isArray(variant)) {
+            throw new HttpError(400, 'Provide valid stock for every product size.');
+          }
+          const size = String(variant.size || '').trim();
+          const rawStock = variant.stock;
+          const stock = typeof rawStock === 'number'
+            ? rawStock
+            : typeof rawStock === 'string' && rawStock.trim() !== ''
+              ? Number(rawStock)
+              : Number.NaN;
+          if (!sizes.includes(size) || seenSizes.has(size)) {
+            throw new HttpError(400, 'Provide stock for every product size exactly once.');
+          }
+          if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) {
+            throw new HttpError(400, 'Each size stock must be a whole number between 0 and 1,000,000.');
+          }
+          seenSizes.add(size);
+          return { size, stock };
+        });
+        if (seenSizes.size !== sizes.length) {
+          throw new HttpError(400, 'Provide stock for every product size exactly once.');
+        }
       }
       fields.createdAt = new Date().toISOString();
       const insertProduct = db.prepare(`
@@ -712,7 +744,7 @@ function createApp() {
       `);
       db.transaction(() => {
         insertProduct.run(fields);
-        sizes.forEach((size) => {
+        sizeStocks.forEach(({ size, stock }) => {
           insertVariant.run(
             crypto.randomUUID(),
             fields.id,
@@ -720,7 +752,7 @@ function createApp() {
             'Default',
             '',
             fields.basePrice,
-            initialStock,
+            stock,
             JSON.stringify(fields.imageUrl ? [fields.imageUrl] : []),
           );
         });

@@ -71,6 +71,10 @@ function defaultSizesForCategory(category?: { slug?: string }) {
   return 'XS, S, M, L, XL';
 }
 
+function parseSizes(value: string) {
+  return [...new Set(value.split(',').map((size) => size.trim()).filter(Boolean))];
+}
+
 function makeSlug(value: string) {
   return value
     .toLowerCase()
@@ -97,13 +101,14 @@ export function AdminProducts() {
     collectionId: '',
     gender: 'unisex',
     sizes: 'XS, S, M, L, XL',
+    sizeStocks: {} as Record<string, string>,
     basePrice: '',
-    initialStock: '25',
     imageUrl: '',
     sizeGuide: '',
     fitNotes: '',
     active: true
   });
+  const parsedSizes = parseSizes(formData.sizes);
 
   const fetchProducts = async () => {
     try {
@@ -145,6 +150,27 @@ export function AdminProducts() {
       return;
     }
 
+    if (!editingProduct) {
+      if (parsedSizes.length === 0 || parsedSizes.length > 30 || parsedSizes.some((size) => size.length > 30)) {
+        toast.error('Add between 1 and 30 valid product sizes.');
+        return;
+      }
+
+      const hasInvalidStock = parsedSizes.some((size) => {
+        const value = formData.sizeStocks[size];
+        const stock = Number(value);
+        return value === undefined
+          || value.trim() === ''
+          || !Number.isInteger(stock)
+          || stock < 0
+          || stock > 1000000;
+      });
+      if (hasInvalidStock) {
+        toast.error('Enter a whole-number stock quantity from 0 to 1,000,000 for every size.');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const productData = {
@@ -166,8 +192,11 @@ export function AdminProducts() {
       } else {
         await (storeApi.db as any).products.create({
           ...productData,
-          initialStock: Number(formData.initialStock),
-          sizes: formData.sizes.split(',').map((size) => size.trim()).filter(Boolean),
+          sizes: parsedSizes,
+          sizeStocks: parsedSizes.map((size) => ({
+            size,
+            stock: Number(formData.sizeStocks[size]),
+          })),
         });
       }
 
@@ -212,8 +241,8 @@ export function AdminProducts() {
       collectionId: '',
       gender: 'unisex',
       sizes: 'XS, S, M, L, XL',
+      sizeStocks: {},
       basePrice: '',
-      initialStock: '25',
       imageUrl: '',
       sizeGuide: '',
       fitNotes: '',
@@ -230,8 +259,8 @@ export function AdminProducts() {
       collectionId: product.collectionId || '',
       gender: product.gender || 'unisex',
       sizes: '',
+      sizeStocks: {},
       basePrice: String(product.basePrice),
-      initialStock: '25',
       imageUrl: product.imageUrl || '',
       sizeGuide: product.sizeGuide || '',
       fitNotes: product.fitNotes || '',
@@ -327,7 +356,10 @@ export function AdminProducts() {
                     onValueChange={(value) => setFormData((previous) => ({
                       ...previous,
                       collectionId: value,
-                      ...(!editingProduct ? { sizes: defaultSizesForCategory(collections.find((collection) => collection.id === value)) } : {}),
+                      ...(!editingProduct ? {
+                        sizes: defaultSizesForCategory(collections.find((collection) => collection.id === value)),
+                        sizeStocks: {},
+                      } : {}),
                     }))}
                   >
                     <SelectTrigger>
@@ -384,18 +416,29 @@ export function AdminProducts() {
                 </div>
               </div>
               {!editingProduct && (
-                <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-widest">Starting stock</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="1000000"
-                    step="1"
-                    value={formData.initialStock}
-                    onChange={(e) => setFormData(prev => ({ ...prev, initialStock: e.target.value }))}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">A default purchasable product option will be created with this stock.</p>
+                <div className="space-y-3">
+                  <Label className="text-xs uppercase tracking-widest">Available stock by size *</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {parsedSizes.map((size) => (
+                      <div key={size} className="space-y-2">
+                        <Label htmlFor={`stock-${size}`} className="text-xs">{size}</Label>
+                        <Input
+                          id={`stock-${size}`}
+                          type="number"
+                          min="0"
+                          max="1000000"
+                          step="1"
+                          value={formData.sizeStocks[size] ?? ''}
+                          onChange={(event) => setFormData((previous) => ({
+                            ...previous,
+                            sizeStocks: { ...previous.sizeStocks, [size]: event.target.value },
+                          }))}
+                          required
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Enter the actual quantity on hand for every size. New sizes start blank, not with assumed stock.</p>
                 </div>
               )}
               <div className="space-y-2">

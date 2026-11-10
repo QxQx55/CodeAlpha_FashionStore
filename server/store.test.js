@@ -244,6 +244,64 @@ test('registers customers and places orders using current database prices and st
   assert.deepEqual(newVariants.map((variant) => variant.size).sort(), ['L', 'M', 'S']);
   assert.ok(newVariants.every((variant) => variant.price === 2300 && variant.stock === 7));
 
+  const perSizeProduct = await request('/api/products', {
+    method: 'POST',
+    token: adminRegistration.body.token,
+    body: JSON.stringify({
+      name: 'Product with Per-Size Stock',
+      slug: 'product-with-per-size-stock',
+      collectionId: 'coll_women',
+      gender: 'women',
+      basePrice: 3100,
+      imageUrl: '/images/products/women-dress-floral.jpg',
+      active: '0',
+      sizes: ['S', 'M', 'L'],
+      sizeStocks: [
+        { size: 'S', stock: 2 },
+        { size: 'M', stock: 5 },
+        { size: 'L', stock: 0 },
+      ],
+    }),
+  });
+  assert.equal(perSizeProduct.response.status, 201);
+  const perSizeVariants = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ productId: perSizeProduct.body.id }))}`)).body;
+  assert.deepEqual(
+    Object.fromEntries(perSizeVariants.map((variant) => [variant.size, variant.stock])),
+    { S: 2, M: 5, L: 0 },
+  );
+
+  const incompleteSizeStocks = await request('/api/products', {
+    method: 'POST',
+    token: adminRegistration.body.token,
+    body: JSON.stringify({
+      name: 'Incomplete Size Stock Product',
+      slug: 'incomplete-size-stock-product',
+      collectionId: 'coll_women',
+      gender: 'women',
+      basePrice: 3100,
+      sizes: ['S', 'M'],
+      sizeStocks: [{ size: 'S', stock: 1 }],
+    }),
+  });
+  assert.equal(incompleteSizeStocks.response.status, 400);
+  assert.match(incompleteSizeStocks.body.error, /stock for every product size/);
+
+  const invalidSizeStock = await request('/api/products', {
+    method: 'POST',
+    token: adminRegistration.body.token,
+    body: JSON.stringify({
+      name: 'Invalid Size Stock Product',
+      slug: 'invalid-size-stock-product',
+      collectionId: 'coll_women',
+      gender: 'women',
+      basePrice: 3100,
+      sizes: ['S'],
+      sizeStocks: [{ size: 'S', stock: null }],
+    }),
+  });
+  assert.equal(invalidSizeStock.response.status, 400);
+  assert.match(invalidSizeStock.body.error, /whole number between 0 and 1,000,000/);
+
   const updatedProduct = await request(`/api/products/${product.body.id}`, {
     method: 'PUT',
     token: adminRegistration.body.token,

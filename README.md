@@ -35,7 +35,7 @@ npm.cmd run dev
 
 Alternatively, add `ADMIN_EMAIL=owner@example.com` to `.env.local`. If you change it while the server is running, restart the server; registering a new account with that email grants admin access, and an existing account is promoted on restart.
 
-Administrators can add a product in **Manage Store → Products → Add Product**. Select an existing category, enter a price and starting stock, and choose whether the listing is active. Saving writes the product and its purchasable default variant to SQLite in one transaction. Active products are available from the catalog immediately. Editing a product's base price updates variants that still use that base price.
+Administrators can add a product in **Manage Store → Products → Add Product**. Select an existing category, enter a price and the actual stock quantity for each size, upload or provide a product photo, and choose whether the listing is active. Stock values are required per size; the form does not assume inventory quantities. Saving writes the product and its variants to SQLite in one transaction. Active products are available from the catalog immediately. Editing a product's base price updates variants that still use that base price.
 
 Do not expose the development server publicly.
 
