@@ -25,7 +25,6 @@ interface Product {
   isSample?: number;
 }
 
-const featuredCategorySlugs = ['women', 'men', 'traditional'];
 const categoryColors = ['bg-[#f6d23b]', 'bg-[#32bfca]', 'bg-[#ed9eaa]'];
 
 export function Home() {
@@ -101,10 +100,7 @@ export function Home() {
     };
   }, []);
 
-  const featuredCollections = featuredCategorySlugs
-    .map((slug) => collections.find((collection) => collection.slug === slug))
-    .filter((collection): collection is Collection => Boolean(collection));
-  const categoryCards = featuredCollections.length === 3 ? featuredCollections : collections.slice(0, 3);
+  const categoryCards = collections;
   const previewNotice = loadError || 'Sample listings are for display only and cannot be purchased. Add an active real product with a photo and available stock to activate live shopping.';
   const hasSampleListings = products.some((product) => product.isSample === 1);
 
@@ -189,7 +185,7 @@ export function Home() {
             <Link
               key={collection.id}
               to={`/collections/${collection.slug}`}
-              className={`group relative flex h-[145px] items-center overflow-hidden ${categoryColors[index]} sm:h-[165px]`}
+              className={`group relative flex h-[145px] items-center overflow-hidden ${categoryColors[index % categoryColors.length]} sm:h-[165px]`}
             >
               <div className="relative z-10 w-[55%] pl-4 sm:pl-5">
                 <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-black/60">Explore the edit</p>
@@ -210,7 +206,7 @@ export function Home() {
               />
             </Link>
           ))}
-          {categoryCards.length === 0 && !loadError && [1, 2, 3].map((item) => (
+          {categoryCards.length === 0 && !loadError && Array.from({ length: 8 }, (_, index) => index).map((item) => (
             <div key={item} className="h-[150px] animate-pulse bg-[#f2eeeb] sm:h-[165px]" />
           ))}
         </div>

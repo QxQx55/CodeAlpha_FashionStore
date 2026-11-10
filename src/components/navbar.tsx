@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Heart, LogOut, Menu, Search, Settings, ShoppingBag, UserRound, X } from 'lucide-react';
 import { useCart } from './cart-provider';
 import { useAuth } from './auth-provider';
@@ -17,7 +17,8 @@ interface CollectionLink {
 const collectionOrder = ['women', 'men', 'kids', 'shoes', 'traditional', 'accessories', 'outerwear', 'activewear'];
 
 function sortCollections(collections: CollectionLink[]) {
-  return [...collections].sort((a, b) => {
+  const uniqueCollections = [...new Map(collections.map((collection) => [collection.slug, collection])).values()];
+  return uniqueCollections.sort((a, b) => {
     const aOrder = collectionOrder.indexOf(a.slug);
     const bOrder = collectionOrder.indexOf(b.slug);
     if (aOrder === -1 && bOrder === -1) return a.name.localeCompare(b.name);
@@ -66,6 +67,11 @@ export function Navbar() {
 
   const accountLabel = user ? `Hello, ${user.displayName.split(' ')[0]}` : 'Sign in';
   const accountPath = isAuthenticated ? '/account' : '/login';
+  const navLinkClass = ({ isActive }: { isActive: boolean }) => (
+    `shrink-0 rounded-sm px-2 py-1 transition-colors ${
+      isActive ? 'bg-[#fff5ef] text-[#df713a]' : 'text-[#3d3d3d] hover:bg-[#fff5ef] hover:text-[#df713a]'
+    }`
+  );
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white">
@@ -160,14 +166,14 @@ export function Navbar() {
       </div>
 
       <nav aria-label="Shop categories" className="border-y border-[#ededed] bg-[#fcfcfc]">
-        <div className="container mx-auto flex items-center justify-start gap-4 overflow-x-auto px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.05em] text-[#3d3d3d] sm:justify-center sm:gap-6 sm:px-4 sm:text-[10px] sm:tracking-[0.08em] lg:gap-8">
-          <Link to="/" className="shrink-0 rounded-sm px-1 py-1 text-[#df713a] hover:bg-[#fff5ef] sm:px-2">Home</Link>
+        <div className="container mx-auto flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.05em] sm:gap-x-5 sm:px-4 sm:text-[10px] sm:tracking-[0.08em] lg:gap-x-8">
+          <NavLink to="/" end className={navLinkClass}>Home</NavLink>
           {collections.map((collection) => (
-            <Link key={collection.id} to={`/collections/${collection.slug}`} className="shrink-0 px-1 py-1 hover:bg-[#fff5ef] hover:text-[#df713a] sm:px-2">
+            <NavLink key={collection.slug} to={`/collections/${collection.slug}`} className={navLinkClass}>
               {collection.name}
-            </Link>
+            </NavLink>
           ))}
-          <Link to="/collections/all?sort=newest" className="shrink-0 px-1 py-1 hover:bg-[#fff5ef] hover:text-[#df713a] sm:px-2">New arrivals</Link>
+          <NavLink to="/collections/all?sort=newest" className={navLinkClass}>New arrivals</NavLink>
         </div>
       </nav>
 
