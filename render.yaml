@@ -22,4 +22,4 @@ services:
       - key: PUBLIC_APP_URL
         value: https://www.codealpha.tech
       - key: STORE_MODE
-        value: preview
+        value: auto

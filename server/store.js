@@ -12,7 +12,7 @@ db.pragma('journal_mode = WAL');
 
 export const resources = {
   collections: ['id', 'name', 'slug', 'description', 'imageUrl', 'active'],
-  products: ['id', 'name', 'slug', 'description', 'basePrice', 'imageUrl', 'collectionId', 'gender', 'active', 'sizeGuide', 'fitNotes', 'createdAt'],
+  products: ['id', 'name', 'slug', 'description', 'basePrice', 'imageUrl', 'collectionId', 'gender', 'active', 'sizeGuide', 'fitNotes', 'createdAt', 'isSample'],
   productVariants: ['id', 'productId', 'size', 'color', 'material', 'price', 'stock', 'imageUrls'],
   cartItems: ['id', 'userId', 'variantId', 'quantity'],
   wishlist: ['id', 'userId', 'productId'],
@@ -42,8 +42,11 @@ export function initializeDatabase() {
       imageUrl TEXT NOT NULL DEFAULT '', collectionId TEXT,
       gender TEXT NOT NULL DEFAULT 'unisex',
       active TEXT NOT NULL DEFAULT '1', sizeGuide TEXT, fitNotes TEXT,
-      createdAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL, isSample INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (collectionId) REFERENCES collections(id) ON DELETE SET NULL
+    );
+    CREATE TABLE IF NOT EXISTS storeSettings (
+      key TEXT PRIMARY KEY, value TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS productVariants (
       id TEXT PRIMARY KEY, productId TEXT NOT NULL, size TEXT, color TEXT,
@@ -88,6 +91,9 @@ export function initializeDatabase() {
   `);
 
   const productColumns = db.prepare('PRAGMA table_info(products)').all();
+  if (!productColumns.some((column) => column.name === 'isSample')) {
+    db.exec('ALTER TABLE products ADD COLUMN isSample INTEGER NOT NULL DEFAULT 0');
+  }
   if (!productColumns.some((column) => column.name === 'gender')) {
     db.exec("ALTER TABLE products ADD COLUMN gender TEXT NOT NULL DEFAULT 'unisex'");
     db.exec(`
@@ -134,6 +140,8 @@ export function initializeDatabase() {
     WHERE productId = @id AND (imageUrls = @legacyImageUrls OR productId LIKE 'demo_%')
   `);
   const seed = db.transaction(() => {
+    db.prepare('INSERT OR IGNORE INTO storeSettings (key, value) VALUES (?, ?)')
+      .run('mode', process.env.STORE_MODE === 'live' ? 'live' : 'preview');
     collections.forEach((collection) => insertCollection.run(collection));
     products.forEach((product) => insertProduct.run(product));
     productVariants.forEach((variant) => insertVariant.run(variant));
@@ -157,6 +165,10 @@ export function initializeDatabase() {
     });
   });
   seed();
+
+  const seededProductIds = products.map((product) => product.id);
+  const placeholders = seededProductIds.map(() => '?').join(', ');
+  db.prepare(`UPDATE products SET isSample = 1 WHERE id IN (${placeholders})`).run(...seededProductIds);
 }
 
 initializeDatabase();

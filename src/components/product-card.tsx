@@ -14,6 +14,7 @@ interface ProductCardProps {
     basePrice: number;
     images?: string[];
     imageUrl?: string;
+    isSample?: number;
   };
 }
 
@@ -95,6 +96,11 @@ export function ProductCard({ product }: ProductCardProps) {
             />
           </div>
         </Link>
+        {product.isSample === 1 && (
+          <span className="absolute left-2 top-2 bg-white/95 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-gray-700">
+            Sample · not for sale
+          </span>
+        )}
         <button
           type="button"
           onClick={toggleWishlist}

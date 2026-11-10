@@ -125,6 +125,8 @@ export const storeApi = {
       sandbox: boolean;
       checkoutAvailable: boolean;
       demoCheckoutAvailable: boolean;
+      storeMode: 'preview' | 'live';
+      previewMode: boolean;
     }>('/api/payments/chapa/status'),
     verifyChapaPayment: (txRef: string) => apiRequest<StoreOrder>(`/api/payments/chapa/verify/${encodeURIComponent(txRef)}`),
   },

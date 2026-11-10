@@ -32,7 +32,6 @@ const initialAddress: ShippingAddress = {
   phone: '',
 };
 
-const previewCatalog = import.meta.env.VITE_CATALOG_MODE !== 'live';
 const demoPaymentOptions = [
   { id: 'telebirr', label: 'Telebirr (simulated)' },
   { id: 'cbe_birr', label: 'CBE Birr (simulated)' },
@@ -45,9 +44,8 @@ export function Checkout() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<ShippingAddress>(initialAddress);
-  const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'chapa' | 'demo'>(
-    previewCatalog ? 'demo' : 'cash_on_delivery',
-  );
+  const [previewCatalog, setPreviewCatalog] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'chapa' | 'demo'>('demo');
   const [demoChannel, setDemoChannel] = useState<'telebirr' | 'cbe_birr' | 'card'>('telebirr');
   const [chapaAvailable, setChapaAvailable] = useState(false);
   const [demoCheckoutAvailable, setDemoCheckoutAvailable] = useState(false);
@@ -65,10 +63,11 @@ export function Checkout() {
 
   useEffect(() => {
     storeApi.api.getChapaStatus()
-      .then(({ available, demoCheckoutAvailable: demoAvailable }) => {
+      .then(({ available, demoCheckoutAvailable: demoAvailable, previewMode }) => {
         setChapaAvailable(available);
         setDemoCheckoutAvailable(demoAvailable);
-        if (previewCatalog && demoAvailable) setPaymentMethod('demo');
+        setPreviewCatalog(previewMode);
+        setPaymentMethod(previewMode && demoAvailable ? 'demo' : 'cash_on_delivery');
       })
       .catch((error) => {
         console.error('Failed to check demo checkout availability:', error);

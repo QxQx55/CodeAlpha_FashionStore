@@ -32,7 +32,7 @@ export function ProductDetail() {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [previewCatalog, setPreviewCatalog] = useState(import.meta.env.VITE_CATALOG_MODE !== 'live');
+  const [previewCatalog, setPreviewCatalog] = useState(true);
   const [cartAvailable, setCartAvailable] = useState(false);
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
@@ -42,6 +42,9 @@ export function ProductDetail() {
     const fetchData = async () => {
       setLoading(true);
       try {
+        storeApi.api.getChapaStatus()
+          .then(({ previewMode }) => setPreviewCatalog(previewMode))
+          .catch((error) => console.error('Failed to check store mode:', error));
         const productData = await (storeApi.db as any).products.list({
           where: { slug }
         });
@@ -72,7 +75,7 @@ export function ProductDetail() {
             where: { productId: p.id }
           });
           setVariants(variantData);
-          setCartAvailable(variantData.length > 0);
+          setCartAvailable(!p.isSample && p.active === '1' && variantData.length > 0);
           if (variantData.length > 0) {
             setSelectedVariant(variantData[0]);
           }
@@ -257,6 +260,9 @@ export function ProductDetail() {
         <div className="lg:col-span-5 space-y-8">
           <div className="space-y-2">
             <h1 className="font-serif text-3xl md:text-4xl font-bold uppercase tracking-tight">{product.name}</h1>
+            {product.isSample === 1 && (
+              <Badge variant="secondary" className="w-fit">Sample listing · not for sale</Badge>
+            )}
             <div className="flex items-center justify-between">
               <p className="text-xl font-bold">{(selectedVariant?.price || product.basePrice).toLocaleString()} ETB</p>
               <div className="flex space-x-2">
@@ -360,10 +366,18 @@ export function ProductDetail() {
 
             <Button 
               className="w-full h-14 uppercase tracking-widest font-bold text-sm"
-              disabled={!cartAvailable || !selectedVariant || selectedVariant.stock === 0}
+              disabled={product.isSample === 1 || !cartAvailable || !selectedVariant || selectedVariant.stock === 0}
               onClick={() => addItem(selectedVariant.id, 1)}
             >
-              {!cartAvailable ? 'Cart requires store connection' : selectedVariant?.stock === 0 ? 'Out of Stock' : previewCatalog ? 'Add to Preview Bag' : 'Add to Bag'}
+              {product.isSample === 1
+                ? 'Sample · Not for sale'
+                : !cartAvailable
+                  ? 'Cart requires store connection'
+                  : selectedVariant?.stock === 0
+                    ? 'Out of Stock'
+                    : previewCatalog
+                      ? 'Add to Preview Bag'
+                      : 'Add to Bag'}
             </Button>
           </div>
 

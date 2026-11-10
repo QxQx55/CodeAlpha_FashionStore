@@ -8,16 +8,18 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate } from 'react-router-dom';
 import { storeApi } from '@/lib/store-api';
 
-const previewCatalog = import.meta.env.VITE_CATALOG_MODE !== 'live';
-
 export function CartDrawer() {
   const { items, totalCount, subtotal, removeItem, updateQuantity, isOpen, setIsOpen } = useCart();
   const navigate = useNavigate();
+  const [previewCatalog, setPreviewCatalog] = useState(true);
   const [demoCheckoutAvailable, setDemoCheckoutAvailable] = useState(false);
 
   useEffect(() => {
     storeApi.api.getChapaStatus()
-      .then(({ demoCheckoutAvailable }) => setDemoCheckoutAvailable(demoCheckoutAvailable))
+      .then(({ demoCheckoutAvailable, previewMode }) => {
+        setDemoCheckoutAvailable(demoCheckoutAvailable);
+        setPreviewCatalog(previewMode);
+      })
       .catch((error) => console.error('Failed to check preview checkout availability:', error));
   }, []);
 

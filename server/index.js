@@ -45,6 +45,12 @@ function createToken(user) {
   return jwt.sign({ sub: user.id }, jwtSecret, { expiresIn: '7d' });
 }
 
+function getStoreMode() {
+  const configuredMode = process.env.STORE_MODE;
+  if (configuredMode === 'live' || configuredMode === 'preview') return configuredMode;
+  return db.prepare('SELECT value FROM storeSettings WHERE key = ?').get('mode')?.value || 'preview';
+}
+
 function authenticate(req, _res, next) {
   const authorization = req.get('authorization') || '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
@@ -88,8 +94,16 @@ function validateCartQuantity(variantId, quantity) {
   if (!Number.isInteger(amount) || amount < 1 || amount > 100) {
     throw new HttpError(400, 'Quantity must be a whole number between 1 and 100.');
   }
-  const variant = db.prepare('SELECT stock FROM productVariants WHERE id = ?').get(variantId);
+  const variant = db.prepare(`
+    SELECT v.stock, p.isSample, p.active
+    FROM productVariants v
+    JOIN products p ON p.id = v.productId
+    WHERE v.id = ?
+  `).get(variantId);
   if (!variant) throw new HttpError(404, 'That product option is no longer available.');
+  if (variant.isSample || variant.active !== '1') {
+    throw new HttpError(409, 'This sample or unpublished product is not available for purchase.');
+  }
   if (amount > variant.stock) throw new HttpError(409, 'There is not enough stock for that quantity.');
   return amount;
 }
@@ -241,7 +255,8 @@ function createApp() {
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.get('/api/payments/chapa/status', (_req, res) => {
-    const previewMode = process.env.STORE_MODE !== 'live';
+    const storeMode = getStoreMode();
+    const previewMode = storeMode !== 'live';
     const testKey = isChapaTestKey();
     const available = Boolean(process.env.CHAPA_SECRET_KEY) && (previewMode ? testKey : !testKey);
     res.json({
@@ -249,6 +264,8 @@ function createApp() {
       sandbox: previewMode && testKey,
       checkoutAvailable: !previewMode || available,
       demoCheckoutAvailable: previewMode,
+      storeMode,
+      previewMode,
     });
   });
 
@@ -352,6 +369,10 @@ function createApp() {
 
     const clauses = filters.map(([key]) => `"${key}" = ?`);
     const values = filters.map(([, value]) => value);
+    if (resource === 'cartItems') {
+      clauses.push('variantId IN (SELECT v.id FROM productVariants v JOIN products p ON p.id = v.productId WHERE p.isSample = 0 AND p.active = ?)');
+      values.push('1');
+    }
     const orderBy = parseJson(req.query.orderBy, {});
     if (!orderBy || typeof orderBy !== 'object' || Array.isArray(orderBy)) {
       throw new HttpError(400, 'The orderBy parameter must be an object.');
@@ -366,7 +387,7 @@ function createApp() {
   app.post('/api/checkout', authenticate, async (req, res, next) => {
     try {
       const paymentMethod = req.body?.paymentMethod;
-      const previewMode = process.env.STORE_MODE !== 'live';
+      const previewMode = getStoreMode() !== 'live';
       if (paymentMethod === 'demo' && !previewMode) {
         throw new HttpError(503, 'Demo checkout is only available while the store is in preview mode.');
       }
@@ -415,7 +436,7 @@ function createApp() {
       }
 
       const cart = db.prepare(`
-        SELECT ci.variantId, ci.quantity, v.stock, v.price, p.basePrice
+        SELECT ci.variantId, ci.quantity, v.stock, v.price, p.basePrice, p.isSample, p.active
         FROM cartItems ci
         JOIN productVariants v ON v.id = ci.variantId
         JOIN products p ON p.id = v.productId
@@ -423,6 +444,9 @@ function createApp() {
       `).all(req.user.id);
       if (cart.length === 0) throw new HttpError(400, 'Your cart is empty.');
       for (const item of cart) {
+        if (item.isSample || item.active !== '1') {
+          throw new HttpError(409, 'Your cart contains a sample or unpublished product that cannot be purchased.');
+        }
         if (item.quantity > item.stock) throw new HttpError(409, 'A cart item no longer has enough stock.');
       }
 
@@ -675,6 +699,7 @@ function createApp() {
       fields.sizeGuide = String(fields.sizeGuide || '');
       fields.fitNotes = String(fields.fitNotes || '');
       fields.active = fields.active === '0' || fields.active === 0 || fields.active === false ? '0' : '1';
+      fields.isSample = 0;
 
       if (!fields.name || fields.name.length > 200) {
         throw new HttpError(400, 'Enter a product name up to 200 characters.');
@@ -735,8 +760,8 @@ function createApp() {
       }
       fields.createdAt = new Date().toISOString();
       const insertProduct = db.prepare(`
-        INSERT INTO products (id, name, slug, description, basePrice, imageUrl, collectionId, gender, active, sizeGuide, fitNotes, createdAt)
-        VALUES (@id, @name, @slug, @description, @basePrice, @imageUrl, @collectionId, @gender, @active, @sizeGuide, @fitNotes, @createdAt)
+        INSERT INTO products (id, name, slug, description, basePrice, imageUrl, collectionId, gender, active, sizeGuide, fitNotes, createdAt, isSample)
+        VALUES (@id, @name, @slug, @description, @basePrice, @imageUrl, @collectionId, @gender, @active, @sizeGuide, @fitNotes, @createdAt, @isSample)
       `);
       const insertVariant = db.prepare(`
         INSERT INTO productVariants (id, productId, size, color, material, price, stock, imageUrls)
@@ -756,8 +781,25 @@ function createApp() {
             JSON.stringify(fields.imageUrl ? [fields.imageUrl] : []),
           );
         });
+        if (!['live', 'preview'].includes(process.env.STORE_MODE)
+          && fields.active === '1'
+          && fields.imageUrl
+          && sizeStocks.some(({ stock }) => stock > 0)) {
+          db.prepare('UPDATE storeSettings SET value = ? WHERE key = ?').run('live', 'mode');
+          db.prepare(`
+            DELETE FROM cartItems
+            WHERE variantId IN (
+              SELECT v.id FROM productVariants v
+              JOIN products p ON p.id = v.productId
+              WHERE p.isSample = 1
+            )
+          `).run();
+        }
       })();
-      return res.status(201).json(db.prepare('SELECT * FROM products WHERE id = ?').get(fields.id));
+      return res.status(201).json({
+        ...db.prepare('SELECT * FROM products WHERE id = ?').get(fields.id),
+        storeMode: getStoreMode(),
+      });
     }
 
     const entries = Object.entries(fields);
@@ -786,6 +828,7 @@ function createApp() {
           const fields = cleanFields(resource, req.body);
           delete fields.id;
           if (resource === 'products') {
+            delete fields.isSample;
             if (fields.name !== undefined) fields.name = String(fields.name).trim();
             if (fields.slug !== undefined) fields.slug = String(fields.slug).trim();
             if (fields.basePrice !== undefined) fields.basePrice = Number(fields.basePrice);

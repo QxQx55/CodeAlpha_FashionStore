@@ -22,19 +22,26 @@ interface Product {
   images?: string[];
   imageUrl?: string;
   collectionId?: string;
+  isSample?: number;
 }
 
 const featuredCategorySlugs = ['women', 'men', 'traditional'];
-const previewCatalog = import.meta.env.VITE_CATALOG_MODE !== 'live';
 const categoryColors = ['bg-[#f6d23b]', 'bg-[#32bfca]', 'bg-[#ed9eaa]'];
 
 export function Home() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loadError, setLoadError] = useState('');
+  const [previewMode, setPreviewMode] = useState(true);
 
   useEffect(() => {
     let active = true;
+    storeApi.api.getChapaStatus()
+      .then(({ previewMode: isPreviewMode }) => {
+        if (active) setPreviewMode(isPreviewMode);
+      })
+      .catch((error) => console.error('Failed to check store mode:', error));
+
     const fetchStorefront = async () => {
       try {
         const [collectionData, productData] = await Promise.all([
@@ -98,7 +105,8 @@ export function Home() {
     .map((slug) => collections.find((collection) => collection.slug === slug))
     .filter((collection): collection is Collection => Boolean(collection));
   const categoryCards = featuredCollections.length === 3 ? featuredCollections : collections.slice(0, 3);
-  const previewNotice = loadError || 'Sample listings only: this preview catalog is not live inventory. Shopping is disabled until the real catalog is loaded.';
+  const previewNotice = loadError || 'Sample listings are for display only and cannot be purchased. Add an active real product with a photo and available stock to activate live shopping.';
+  const hasSampleListings = products.some((product) => product.isSample === 1);
 
   return (
     <main className="bg-white pb-14">
@@ -167,9 +175,11 @@ export function Home() {
         </div>
       </section>
 
-      {(previewCatalog || loadError) && (
+      {(previewMode || hasSampleListings || loadError) && (
         <p role="status" className="container mx-auto max-w-[1050px] px-3 py-3 text-center text-sm text-red-700 sm:px-5">
-          Preview mode: {previewNotice}
+          {previewMode
+            ? `Preview mode: ${previewNotice}`
+            : 'Sample listings are for display only and cannot be purchased. Real products are available for live orders.'}
         </p>
       )}
 

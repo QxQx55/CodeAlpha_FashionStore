@@ -171,7 +171,13 @@ export function AdminProducts() {
       }
     }
 
+    if (!editingProduct && formData.active && !formData.imageUrl.trim()) {
+      toast.error('Add a real product photo before publishing this listing.');
+      return;
+    }
+
     setSaving(true);
+    let resultingStoreMode: string | undefined;
     try {
       const productData = {
         name: formData.name,
@@ -190,7 +196,7 @@ export function AdminProducts() {
         await (storeApi.db as any).products.update(editingProduct.id, productData);
         toast.success('Product updated');
       } else {
-        await (storeApi.db as any).products.create({
+        const createdProduct = await (storeApi.db as any).products.create({
           ...productData,
           sizes: parsedSizes,
           sizeStocks: parsedSizes.map((size) => ({
@@ -198,10 +204,15 @@ export function AdminProducts() {
             stock: Number(formData.sizeStocks[size]),
           })),
         });
+        resultingStoreMode = createdProduct.storeMode;
       }
 
       await fetchProducts();
-      if (!editingProduct) toast.success('Product saved and published to the storefront.');
+      if (!editingProduct) {
+        toast.success(resultingStoreMode === 'live'
+          ? 'Real product published. Live shopping is now enabled.'
+          : 'Product saved. Live shopping starts after an active product has a photo and available stock.');
+      }
       setIsDialogOpen(false);
       setEditingProduct(null);
       resetForm();
@@ -442,7 +453,7 @@ export function AdminProducts() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="product-photo-file" className="text-xs uppercase tracking-widest">Upload product photo</Label>
+                <Label htmlFor="product-photo-file" className="text-xs uppercase tracking-widest">Upload product photo *</Label>
                 <Input
                   id="product-photo-file"
                   type="file"
@@ -454,6 +465,9 @@ export function AdminProducts() {
                   }}
                 />
                 <p className="text-xs text-muted-foreground">Choose a JPEG, PNG, or WebP image up to 5 MB. It will be uploaded to the store server.</p>
+                {!editingProduct && (
+                  <p className="text-xs text-muted-foreground">With automatic store mode, the first active real product with a photo and positive stock enables live checkout. Sample listings remain visible but cannot be purchased.</p>
+                )}
                 <Label htmlFor="product-photo-url" className="text-xs uppercase tracking-widest">Or enter a photo URL</Label>
                 <Input 
                   id="product-photo-url"

@@ -14,6 +14,14 @@ process.env.CORS_ORIGINS = 'https://www.codealpha.tech,https://codealpha.tech,ht
 process.env.STORE_MODE = 'live';
 const { createApp } = await import('./index.js');
 const { db } = await import('./store.js');
+db.prepare(`
+  INSERT INTO products (id, name, slug, basePrice, imageUrl, collectionId, gender, active, createdAt, isSample)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`).run('test_real_product', 'Verified Test Product', 'verified-test-product', 4500, '/images/products/women-dress-floral.jpg', 'coll_women', 'women', '1', new Date().toISOString(), 0);
+db.prepare(`
+  INSERT INTO productVariants (id, productId, size, price, stock)
+  VALUES (?, ?, ?, ?, ?)
+`).run('test_real_variant_s', 'test_real_product', 'S', 4500, 5);
 let server;
 let baseUrl;
 
@@ -94,7 +102,7 @@ test('registers customers and places orders using current database prices and st
   const previewCartItem = await request('/api/cartItems', {
     token,
     method: 'POST',
-    body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 1 }),
+    body: JSON.stringify({ variantId: 'test_real_variant_s', quantity: 1 }),
   });
   assert.equal(previewCartItem.response.status, 201);
   const removePreviewItem = await request(`/api/cartItems/${previewCartItem.body.id}`, {
@@ -102,19 +110,26 @@ test('registers customers and places orders using current database prices and st
     method: 'DELETE',
   });
   assert.equal(removePreviewItem.response.status, 204);
+  const sampleCartItem = await request('/api/cartItems', {
+    token,
+    method: 'POST',
+    body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 1 }),
+  });
+  assert.equal(sampleCartItem.response.status, 409);
+  assert.match(sampleCartItem.body.error, /sample or unpublished product/);
   process.env.STORE_MODE = 'live';
 
   const excessiveCartItem = await request('/api/cartItems', {
     method: 'POST',
     token: login.body.token,
-    body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 26 }),
+    body: JSON.stringify({ variantId: 'test_real_variant_s', quantity: 26 }),
   });
   assert.equal(excessiveCartItem.response.status, 409);
 
   const cartItem = await request('/api/cartItems', {
     method: 'POST',
     token,
-    body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 2, price: 1 }),
+    body: JSON.stringify({ variantId: 'test_real_variant_s', quantity: 2, price: 1 }),
   });
   assert.equal(cartItem.response.status, 201);
   assert.equal(cartItem.body.quantity, 2);
@@ -149,7 +164,7 @@ test('registers customers and places orders using current database prices and st
 
   const remainingCart = await request('/api/cartItems', { token });
   assert.deepEqual(remainingCart.body, []);
-  const [variant] = (await request('/api/productVariants?where=%7B%22id%22%3A%22variant_hab_1_s%22%7D')).body;
+  const [variant] = (await request('/api/productVariants?where=%7B%22id%22%3A%22test_real_variant_s%22%7D')).body;
   assert.equal(variant.stock, 3);
 
   const secondRegistration = await request('/api/auth/register', {
@@ -363,6 +378,117 @@ test('registers customers and places orders using current database prices and st
 
 });
 
+test('automatically enables live mode for the first complete real product and keeps samples unpurchasable', async () => {
+  const originalStoreMode = process.env.STORE_MODE;
+  const originalAdminEmail = process.env.ADMIN_EMAIL;
+  process.env.STORE_MODE = 'auto';
+  process.env.ADMIN_EMAIL = 'automatic-admin@example.com';
+  db.prepare('UPDATE storeSettings SET value = ? WHERE key = ?').run('preview', 'mode');
+
+  try {
+    const registration = await request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'automatic-admin@example.com',
+        password: 'secure-password-auto',
+        displayName: 'Automatic Admin',
+      }),
+    });
+    assert.equal(registration.response.status, 201);
+
+    const sampleCart = await request('/api/cartItems', {
+      token: registration.body.token,
+      method: 'POST',
+      body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 1 }),
+    });
+    assert.equal(sampleCart.response.status, 409);
+
+    const incompleteProduct = await request('/api/products', {
+      token: registration.body.token,
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Draft Without a Photo',
+        slug: 'draft-without-a-photo',
+        collectionId: 'coll_women',
+        gender: 'women',
+        basePrice: 3000,
+        active: '1',
+        sizes: ['S'],
+        sizeStocks: [{ size: 'S', stock: 3 }],
+      }),
+    });
+    assert.equal(incompleteProduct.body.storeMode, 'preview');
+
+    const realProduct = await request('/api/products', {
+      token: registration.body.token,
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'First Complete Real Product',
+        slug: 'first-complete-real-product',
+        collectionId: 'coll_women',
+        gender: 'women',
+        basePrice: 3200,
+        imageUrl: '/images/products/women-dress-floral.jpg',
+        active: '1',
+        sizes: ['S', 'M'],
+        sizeStocks: [{ size: 'S', stock: 2 }, { size: 'M', stock: 4 }],
+      }),
+    });
+    assert.equal(realProduct.response.status, 201);
+    assert.equal(realProduct.body.storeMode, 'live');
+    assert.equal(realProduct.body.isSample, 0);
+
+    const status = await request('/api/payments/chapa/status');
+    assert.equal(status.body.previewMode, false);
+    assert.equal(status.body.storeMode, 'live');
+
+    const sampleCartAfterActivation = await request('/api/cartItems', {
+      token: registration.body.token,
+      method: 'POST',
+      body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 1 }),
+    });
+    assert.equal(sampleCartAfterActivation.response.status, 409);
+
+    db.prepare('INSERT INTO cartItems (id, userId, variantId, quantity) VALUES (?, ?, ?, ?)')
+      .run(randomUUID(), registration.body.user.id, 'variant_hab_1_s', 1);
+    const visibleCart = await request('/api/cartItems', { token: registration.body.token });
+    assert.deepEqual(visibleCart.body, []);
+    const sampleCheckout = await request('/api/checkout', {
+      token: registration.body.token,
+      method: 'POST',
+      body: JSON.stringify({
+        paymentMethod: 'cash_on_delivery',
+        shippingAddress: {
+          email: 'automatic-admin@example.com',
+          firstName: 'Automatic',
+          lastName: 'Admin',
+          address: '1 Market Street',
+          city: 'Addis Ababa',
+          postalCode: '1000',
+        },
+      }),
+    });
+    assert.equal(sampleCheckout.response.status, 409);
+    assert.match(sampleCheckout.body.error, /sample or unpublished product/);
+    db.prepare('DELETE FROM cartItems WHERE userId = ?').run(registration.body.user.id);
+
+    const realVariant = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ productId: realProduct.body.id }))}`)).body[0];
+    const realCart = await request('/api/cartItems', {
+      token: registration.body.token,
+      method: 'POST',
+      body: JSON.stringify({ variantId: realVariant.id, quantity: 1 }),
+    });
+    assert.equal(realCart.response.status, 201);
+  } finally {
+    db.prepare('UPDATE storeSettings SET value = ? WHERE key = ?').run('preview', 'mode');
+    db.prepare('DELETE FROM products WHERE slug IN (?, ?)').run('draft-without-a-photo', 'first-complete-real-product');
+    if (originalStoreMode === undefined) delete process.env.STORE_MODE;
+    else process.env.STORE_MODE = originalStoreMode;
+    if (originalAdminEmail === undefined) delete process.env.ADMIN_EMAIL;
+    else process.env.ADMIN_EMAIL = originalAdminEmail;
+  }
+});
+
 test('sets security headers and limits repeated sign-in attempts', async () => {
   const health = await request('/api/health');
   assert.equal(health.response.headers.get('x-content-type-options'), 'nosniff');
@@ -447,7 +573,7 @@ test('seeds at least ten category-matched products into every active category', 
   assert.equal(new Set(names).size, names.length, 'product names must be unique');
 });
 
-test('completes no-charge demo checkout without a payment provider and preserves sample inventory', async () => {
+test('completes no-charge demo checkout without a payment provider and preserves real inventory', async () => {
   const originalSecret = process.env.CHAPA_SECRET_KEY;
   const originalStoreMode = process.env.STORE_MODE;
   delete process.env.CHAPA_SECRET_KEY;
@@ -490,7 +616,7 @@ test('completes no-charge demo checkout without a payment provider and preserves
     assert.equal(invalidChannel.response.status, 400);
     assert.match(invalidChannel.body.error, /valid simulated payment option/);
 
-    const variantId = 'variant_demo_men_1_s';
+    const variantId = 'test_real_variant_s';
     const variantBefore = (await request(`/api/productVariants?where=${encodeURIComponent(JSON.stringify({ id: variantId }))}`)).body[0];
     assert.ok(variantBefore.stock > 0);
     const cartItem = await request('/api/cartItems', {
@@ -580,6 +706,8 @@ test('initializes Chapa checkout and only processes an order after verifying pay
       sandbox: true,
       checkoutAvailable: true,
       demoCheckoutAvailable: true,
+      storeMode: 'preview',
+      previewMode: true,
     });
     const previewCashOnDelivery = await request('/api/checkout', {
       token,
@@ -589,7 +717,7 @@ test('initializes Chapa checkout and only processes an order after verifying pay
     assert.equal(previewCashOnDelivery.response.status, 503);
     assert.match(previewCashOnDelivery.body.error, /preview inventory/);
 
-    const variantBefore = (await request('/api/productVariants?where=%7B%22id%22%3A%22variant_demo_men_1_s%22%7D')).body[0];
+    const variantBefore = (await request('/api/productVariants?where=%7B%22id%22%3A%22test_real_variant_s%22%7D')).body[0];
     assert.ok(variantBefore.stock > 0);
 
     await request('/api/cartItems', {
@@ -616,7 +744,7 @@ test('initializes Chapa checkout and only processes an order after verifying pay
     assert.equal(checkout.response.status, 201);
     assert.match(checkout.body.paymentUrl, /^https:\/\/checkout\.chapa\.co\//);
     const initialization = JSON.parse(providerCalls[0].options.body);
-    assert.equal(initialization.amount, '4735.00');
+    assert.equal(initialization.amount, '10350.00');
     assert.equal(initialization.currency, 'ETB');
     assert.equal(initialization.phone_number, '0911234567');
     assert.equal(initialization.return_url, `http://localhost:3000/checkout/complete?tx_ref=${checkout.body.txRef}`);
