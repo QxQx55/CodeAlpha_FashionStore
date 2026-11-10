@@ -1,6 +1,6 @@
 # Image sources and licenses
 
-These are illustrative stock photos, not photos of store inventory. Unsplash photos are used under the [Unsplash License](https://unsplash.com/license). Ethiopian clothing photos from Wikimedia Commons are credited individually below; their licenses require attribution and, where noted, ShareAlike.
+The store owner has confirmed that the sourced images used by the built-in catalog depict the listed products. Unsplash photos are used under the [Unsplash License](https://unsplash.com/license). Ethiopian clothing photos from Wikimedia Commons are credited individually below; their licenses require attribution and, where noted, ShareAlike.
 
 ## Unsplash
 

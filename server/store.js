@@ -168,7 +168,13 @@ export function initializeDatabase() {
 
   const seededProductIds = products.map((product) => product.id);
   const placeholders = seededProductIds.map(() => '?').join(', ');
-  db.prepare(`UPDATE products SET isSample = 1 WHERE id IN (${placeholders})`).run(...seededProductIds);
+  const promoteSeedCatalog = db.transaction(() => {
+    if (db.prepare('SELECT value FROM storeSettings WHERE key = ?').get('seedCatalogPromotedToLive')) return;
+    db.prepare(`UPDATE products SET isSample = 0, active = '1' WHERE id IN (${placeholders})`).run(...seededProductIds);
+    db.prepare('UPDATE storeSettings SET value = ? WHERE key = ?').run('live', 'mode');
+    db.prepare('INSERT INTO storeSettings (key, value) VALUES (?, ?)').run('seedCatalogPromotedToLive', '1');
+  });
+  promoteSeedCatalog.immediate();
 }
 
 initializeDatabase();

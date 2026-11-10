@@ -13,7 +13,7 @@ process.env.ADMIN_EMAIL = 'admin@example.com';
 process.env.CORS_ORIGINS = 'https://www.codealpha.tech,https://codealpha.tech,https://code-alpha-fashion-store-zuw8.vercel.app,https://code-alpha-fashion-store.vercel.app';
 process.env.STORE_MODE = 'live';
 const { createApp } = await import('./index.js');
-const { db } = await import('./store.js');
+const { db, initializeDatabase } = await import('./store.js');
 db.prepare(`
   INSERT INTO products (id, name, slug, basePrice, imageUrl, collectionId, gender, active, createdAt, isSample)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -107,6 +107,36 @@ test('serves footer content publicly and restricts edits to administrators', asy
   assert.equal(oversizedSettings.response.status, 400);
 });
 
+test('promotes the owner-verified seeded catalog to live inventory on startup', async () => {
+  const seededProductId = db.prepare(`
+    SELECT productId FROM productVariants WHERE id = ?
+  `).get('variant_hab_1_s').productId;
+  const originalStoreMode = process.env.STORE_MODE;
+  db.prepare('DELETE FROM storeSettings WHERE key = ?').run('seedCatalogPromotedToLive');
+  db.prepare('UPDATE products SET isSample = 1, active = ? WHERE id = ?').run('0', seededProductId);
+  db.prepare('UPDATE storeSettings SET value = ? WHERE key = ?').run('preview', 'mode');
+  process.env.STORE_MODE = 'auto';
+  try {
+    initializeDatabase();
+    const seededVariant = db.prepare(`
+      SELECT p.isSample, p.active
+      FROM productVariants v
+      JOIN products p ON p.id = v.productId
+      WHERE v.id = ?
+    `).get('variant_hab_1_s');
+    assert.deepEqual(seededVariant, { isSample: 0, active: '1' });
+    assert.equal(db.prepare('SELECT value FROM storeSettings WHERE key = ?').get('mode').value, 'live');
+    assert.equal(db.prepare('SELECT value FROM storeSettings WHERE key = ?').get('seedCatalogPromotedToLive').value, '1');
+
+    db.prepare('UPDATE products SET active = ? WHERE id = ?').run('0', seededProductId);
+    initializeDatabase();
+    assert.equal(db.prepare('SELECT active FROM products WHERE id = ?').get(seededProductId).active, '0');
+  } finally {
+    process.env.STORE_MODE = originalStoreMode;
+    db.prepare('UPDATE products SET isSample = 0, active = ? WHERE id = ?').run('1', seededProductId);
+  }
+});
+
 test('registers customers and places orders using current database prices and stock', async () => {
   const catalog = await request('/api/products?where=%7B%22slug%22%3A%22classic-mens-habesha-kemis%22%7D');
   assert.equal(catalog.response.status, 200);
@@ -163,13 +193,21 @@ test('registers customers and places orders using current database prices and st
     method: 'DELETE',
   });
   assert.equal(removePreviewItem.response.status, 204);
-  const sampleCartItem = await request('/api/cartItems', {
-    token,
-    method: 'POST',
-    body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 1 }),
-  });
-  assert.equal(sampleCartItem.response.status, 409);
-  assert.match(sampleCartItem.body.error, /sample or unpublished product/);
+  const seededProductId = db.prepare(`
+    SELECT productId FROM productVariants WHERE id = ?
+  `).get('variant_hab_1_s').productId;
+  db.prepare('UPDATE products SET isSample = 1 WHERE id = ?').run(seededProductId);
+  try {
+    const sampleCartItem = await request('/api/cartItems', {
+      token,
+      method: 'POST',
+      body: JSON.stringify({ variantId: 'variant_hab_1_s', quantity: 1 }),
+    });
+    assert.equal(sampleCartItem.response.status, 409);
+    assert.match(sampleCartItem.body.error, /sample or unpublished product/);
+  } finally {
+    db.prepare('UPDATE products SET isSample = 0 WHERE id = ?').run(seededProductId);
+  }
   process.env.STORE_MODE = 'live';
 
   const excessiveCartItem = await request('/api/cartItems', {
@@ -437,6 +475,10 @@ test('automatically enables live mode for the first complete real product and ke
   process.env.STORE_MODE = 'auto';
   process.env.ADMIN_EMAIL = 'automatic-admin@example.com';
   db.prepare('UPDATE storeSettings SET value = ? WHERE key = ?').run('preview', 'mode');
+  const sampleProductId = db.prepare(`
+    SELECT productId FROM productVariants WHERE id = ?
+  `).get('variant_hab_1_s').productId;
+  db.prepare('UPDATE products SET isSample = 1 WHERE id = ?').run(sampleProductId);
 
   try {
     const registration = await request('/api/auth/register', {
@@ -533,6 +575,7 @@ test('automatically enables live mode for the first complete real product and ke
     });
     assert.equal(realCart.response.status, 201);
   } finally {
+    db.prepare('UPDATE products SET isSample = 0 WHERE id = ?').run(sampleProductId);
     db.prepare('UPDATE storeSettings SET value = ? WHERE key = ?').run('preview', 'mode');
     db.prepare('DELETE FROM products WHERE slug IN (?, ?)').run('draft-without-a-photo', 'first-complete-real-product');
     if (originalStoreMode === undefined) delete process.env.STORE_MODE;
